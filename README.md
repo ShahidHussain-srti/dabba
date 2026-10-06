@@ -113,11 +113,12 @@ the exact mesh that gets exported, so what you see is what you print.
 
 Files in `src/`: `util` state, `items` compartment shapes, `layout` sizes and placement,
 `geometry` solids, `texture` surface patterns, `raster` the face masks, `export` the case as
-printable objects, `gl` 3D view, `plan` the planner, `face` the decoration editor, and `app`
+printable objects, `gl` lid poses and picking in the 3D view, `plan` the planner, `face` the decoration editor, and `app`
 to wire it all up.
 
 The parts Dabba shares with Keychain Studio (masks and contours, borders, text and
-pictures, the 3MF writer, share links, undo, number fields and most of the styling) live in
+pictures, the 3MF writer, the 3D viewer, share links, undo, number fields and most of the
+styling) live in
 [Workbench](https://github.com/ShahidHussain-srti/workbench), copied into
 `vendor/workbench/`.
 
