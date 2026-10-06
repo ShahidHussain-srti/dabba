@@ -120,11 +120,11 @@ window.CS = window.CS || {};
     if (face.enabled) {
       CS.faceItems(face).forEach(function (e) {
         if (e.kind === 'border') { this._border(feat.g, t, fo, face); return; }
-        if (e.kind === 'text') { CS.drawText(feat.g, e.item, t, { fill: e.item.color }); return; }
+        if (e.kind === 'text') { WB.drawText(feat.g, e.item, t, { fill: e.item.color }); return; }
         if (e.item.source === 'none') return;
         var art = layer('faceart');
-        if (!CS.drawArt(art.g, e.item, t)) return;
-        if (CS.resolveArtMode(e.item) !== 'alpha') {
+        if (!WB.drawArt(art.g, e.item, t)) return;
+        if (WB.resolveArtMode(e.item) !== 'alpha') {
           // keep a thresholded photo readable while it is being tuned
           art.g.globalCompositeOperation = 'source-atop';
           art.g.fillStyle = e.item.color;
@@ -224,7 +224,7 @@ window.CS = window.CS || {};
       var ppmm = WB.clamp(900 / Math.max(fo.fullW, fo.fullH), 6, 16);
       var g = WB.makeGrid(fo.fullW, fo.fullH, ppmm);
       var plate = CS.faceMask(fo, g);
-      var ring = CS.borderMask(face.border, fo, g, plate);
+      var ring = WB.borderMask(face.border, fo, g, plate);
       var cv = document.createElement('canvas');
       cv.width = g.cols; cv.height = g.rows;
       if (ring) {
@@ -258,14 +258,14 @@ window.CS = window.CS || {};
     if (!face.enabled) return out;
 
     (face.arts || []).forEach(function (a, i) {
-      var p = CS.artPlacement(a, t);
+      var p = WB.artPlacement(a, t);
       if (!p) return;
       out.push({ key: 'art:' + i, label: 'Picture ' + (i + 1), cx: p.cx, cy: p.cy,
                  w: p.w, h: p.h, rot: -a.rotation * Math.PI / 180 });
     });
 
     (face.texts || []).forEach(function (tx, i) {
-      var L = CS.textLayout(ctx, tx, t);
+      var L = WB.textLayout(ctx, tx, t);
       if (!L || L.width < 4) return;
       out.push({ key: 'text:' + i, label: 'Text ' + (i + 1),
                  cx: t.ox + tx.x * t.s, cy: t.oy - tx.y * t.s,

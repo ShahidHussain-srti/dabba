@@ -120,7 +120,7 @@
 
   function populate() {
     var bs = $('#f-b-style');
-    CS.BORDER_STYLES.forEach(function (st) {
+    WB.BORDER_STYLES.forEach(function (st) {
       var o = document.createElement('option');
       o.value = st[0]; o.textContent = st[1];
       bs.appendChild(o);
@@ -420,7 +420,7 @@
         ', keeping at least ' + minD.toFixed(2) + ' mm (' + CS.MIN_LAYERS + ' layers) behind it.' +
         (rel.snap.tooThin ? ' Too thin for that — thicken the wall.' : '');
 
-    var wavy = CS.isWavyBorder(f.border.style);
+    var wavy = WB.isWavyBorder(f.border.style);
     var gl = $('#lbl-b-gap'), dl = $('#lbl-b-dashes');
     if (gl) gl.textContent = wavy ? 'Wave depth' : 'Gap';
     if (dl) dl.textContent = wavy ? 'Waves' : 'Count';

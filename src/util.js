@@ -120,14 +120,9 @@ window.CS = window.CS || {};
 
   /* Bitmaps live outside the serialisable state, keyed by the picture's id.
      `texture` is the tile for the image texture, if any. */
-  CS.assets = { images: {}, drawings: {}, texture: null };
+  CS.assets = WB.assets;          // pictures, shared with the library's decoration code
+  CS.assets.texture = null;
 
-  CS.artBitmap = function (art) {
-    if (!art) return null;
-    if (art.source === 'image') return CS.assets.images[art.id] || null;
-    if (art.source === 'draw') return CS.assets.drawings[art.id] || null;
-    return null;
-  };
 
   /* Every element on a face, bottom to top: the border first, then pictures,
      then text. Later entries win where they overlap. */
