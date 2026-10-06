@@ -742,7 +742,7 @@
     lastModel = model;
     if (viewer && !viewer.failed) {
       var first = !viewer.count;
-      viewer.setModel(model.parts, model.D);
+      viewer.setModel(model.parts, model.D, model.atlas);
       viewer.setOutline(state.selected);
       if (first) viewer.frame();
       viewer.draw();

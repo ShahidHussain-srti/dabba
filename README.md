@@ -73,9 +73,10 @@ the geometry engine ([Manifold](https://github.com/elalish/manifold)) is bundled
   clasps. Each wall and face of
   the base and lid can use the main pattern, another one, or none. Textured walls are built
   as an even grid of columns round the outline and rows up it, and textured faces are
-  stamped with a regular x/y grid. Every sample is about a tenth of the pattern size
-  (finer at higher quality), pushed inwards and faded out near rounded edges and the
-  parting line so the halves still meet cleanly.
+  stamped with a regular x/y grid. With the **Fine** engine (default), the export samples about 30 times per repeat and Manifold then
+  simplifies to within 0.01 mm, so triangles stay dense only where the surface bends.
+  The preview builds a light mesh and shades it per pixel from a height atlas of the
+  same texture. **Classic** keeps the earlier single-density method.
 - **Decoration** on the lid top and the base underside, done the same way as Keychain
   Studio: borders, any number of text boxes and pictures, one colour per element, and
   inlay / engraved / raised per face.

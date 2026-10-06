@@ -125,7 +125,7 @@ window.CS = window.CS || {};
       build: 'case',            // 'case' = base + lid; 'tray' = base only
       gridfinity: { enabled: false, magnets: true },
       texture: {
-        enabled: false, pattern: 'knurl', depth: 0.5, raise: 0, scale: 4, angle: 0, border: 1,
+        enabled: false, pattern: 'knurl', depth: 0.5, raise: 0, scale: 4, angle: 0, border: 1, engine: 'fine',
         sides: {
           base: { front: 'all', back: 'all', left: 'all', right: 'all', face: 'none' },
           lid:  { front: 'all', back: 'all', left: 'all', right: 'all', face: 'none' }

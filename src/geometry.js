@@ -496,22 +496,35 @@ window.CS = window.CS || {};
   /* ── surface texture ───────────────────────────────────────────── */
   /* A textured half is built directly as one structured mesh rather than by
      subdividing the hull: a grid of columns running round the outline and rows
-     running up it, closed by concentric rings over each face. Every quad is
-     about `res` square, so the pattern is sampled evenly everywhere, and each
-     vertex is then pushed inwards by depth × pattern. Walls are mapped by
-     (distance round the perimeter, z), faces by (x, y). The texture fades out
-     over ~1 mm towards rounded edges and the parting line, so the halves still
-     meet cleanly. Displacement is inward and limited at tight corners, so the
-     surface never folds and the shell stays manifold. */
-  var EPS_R = 0.05;
+     running up it. Every quad is about `res` square, so the pattern is
+     sampled evenly, and each vertex is pushed in (or out) by the pattern.
+     Walls are mapped by (distance round the perimeter, z), faces by (x, y).
 
-  /* Pattern size → grid spacing: ~14 samples per repeat for export, ~9 for
-     the live preview, scaled by quality. */
+     Two engines (state.texture.engine):
+       fine     The export samples far finer than the eye needs, then Manifold
+                simplifies the shell to a 0.01 mm tolerance, so triangles stay
+                dense only where the surface actually bends. The preview builds a light mesh for shape
+                and carries per-vertex atlas coordinates; the viewer shades it
+                per pixel from a height atlas of the very same function.
+       classic  The previous behaviour: one grid density for both, every
+                sample averaged over its cell. Kept as a way back. */
+  var EPS_R = 0.05;
+  var NP = 12;   // per-vertex: x y z | atlas u v | base normal xyz | tangent xyz | kind
+
+  CS.texEngine = function (state) { return (state.texture && state.texture.engine) === 'classic' ? 'classic' : 'fine'; };
+
+  /* Pattern size → grid spacing. Classic: ~14 samples per repeat, 1.5× coarser
+     in the preview. Fine: the export oversamples (~30 per repeat, before
+     simplification); the preview only needs the shape, the detail is shaded. */
   CS.texResFor = function (state, preview) {
     var T = state.texture || {};
     var q = { draft: 1.6, normal: 1, fine: 0.8, ultra: 0.6 }[state.quality] || 1;
-    var r = CS.clamp(Math.max(0.5, T.scale || 4) / 14, 0.12, 0.45) * q;
-    return preview ? CS.clamp(r * 1.5, 0.25, 0.7) : CS.clamp(r, 0.1, 0.7);
+    var scale = Math.max(0.5, T.scale || 4);
+    if (CS.texEngine(state) === 'classic') {
+      var r = CS.clamp(scale / 14, 0.12, 0.45) * q;
+      return preview ? CS.clamp(r * 1.5, 0.25, 0.7) : CS.clamp(r, 0.1, 0.7);
+    }
+    return preview ? CS.clamp(scale / 9 * q, 0.3, 0.8) : CS.clamp(scale / 30 * q, 0.06, 0.2);
   };
 
   function texturePlan(D, state, half) {
@@ -529,163 +542,200 @@ window.CS = window.CS || {};
     return pats;
   }
 
-  function texturedShell(S, D, state, half, pats, res) {
-    var T = state.texture, style = state.outer.edgeStyle, isBase = half === 'base';
-    var depth = CS.clamp(T.depth, 0.05, 3);
-    // Never cut deeper than the wall: always leave 0.8 mm (two lines) behind it.
-    var inCap = Math.max(0.05, D.T0 - 0.8);
-    var raiseOf = texRaise(D, state);
+  /* Everything about one half's textured walls that the mesh, the atlas and
+     the preview all need, so the three can never disagree. */
+  function wallSetup(D, state, half, pats, res) {
+    var T = state.texture, isBase = half === 'base';
     var W = D.W, L = D.L, R = D.R;
-
-    /* Rows up the side: [z, inset]. Fillet rows follow the edge profile; the
-       straight part of the wall gets evenly spaced rows `res` apart. */
-    var rows = [];
-    var fil = filletSteps(isBase ? D.eb : D.et, style, D.seg);
-    var zLo = isBase ? D.eb : D.zP, zHi = isBase ? D.zP : D.zT - D.et;
-    var taper = function (z) { return (isBase ? D.zP - z : z - D.zP) * D.tanO; };
-    if (isBase) fil.forEach(function (f) { if (f[0] < zLo - 1e-6) rows.push([f[0], f[1] + taper(f[0]), true]); });
+    var ws = { isBase: isBase, depth: CS.clamp(T.depth, 0.05, 3), inCap: Math.max(0.05, D.T0 - 0.8),
+               raise: texRaise(D, state), STEP: 0.05 };
+    ws.zLo = isBase ? D.eb : D.zP;
+    ws.zHi = isBase ? D.zP : D.zT - D.et;
+    ws.taper = function (z) { return (isBase ? D.zP - z : z - D.zP) * D.tanO; };
     /* Textured band with a crisp edge: plain up to zA, a 0.05 mm step out to
-       full depth, full depth to zB, and a step back. Every row in the band
-       is "textured"; rows outside it are plain, so the cut-off is hard. */
-    var border = CS.clamp(T.border == null ? 1 : T.border, 0, 20), STEP = 0.05;
-    var zA = zLo + border, zB = zHi - border;
+       full depth, full depth to zB, and a step back. */
+    var border = CS.clamp(T.border == null ? 1 : T.border, 0, 20);
+    ws.border = border;
+    ws.zA = ws.zLo + border; ws.zB = ws.zHi - border;
     /* Beside the lip the lid wall is only its outer half. If the texture is
        deeper than that can take, start the lid's band above the groove. */
     var deepest = Math.max.apply(null, ['front', 'back', 'left', 'right'].map(function (k) {
-      return pats[k] ? Math.min(inCap, depth - raiseOf[k]) : 0;
+      return pats[k] ? Math.min(ws.inCap, ws.depth - ws.raise[k]) : 0;
     }));
-    if (!isBase && D.lipOn && deepest > D.lipT - 0.6) zA = Math.max(zA, D.zP + D.lipH + D.lipC + 0.4);
-    if (zB - zA < 2 * STEP + res) {
-      rows.push([zLo, taper(zLo), true], [zHi, taper(zHi), true]);   // no room: leave the wall plain
-    } else {
-      if (border > 0) rows.push([zLo, taper(zLo), true]);
-      rows.push([zA, taper(zA), true]);
-      var a0 = zA + STEP, b0 = zB - STEP, nz = Math.max(1, Math.ceil((b0 - a0) / res));
-      for (var k = 0; k <= nz; k++) { var z = a0 + (b0 - a0) * k / nz; rows.push([z, taper(z), false]); }
-      rows.push([zB, taper(zB), true]);
-      if (border > 0) rows.push([zHi, taper(zHi), true]);
-    }
-    if (!isBase) fil.slice().reverse().forEach(function (f) {
-      var zz = D.zT - f[0];
-      if (zz > zHi + 1e-6) rows.push([zz, f[1] + taper(zz), true]);
-    });
+    if (!isBase && D.lipOn && deepest > D.lipT - 0.6) ws.zA = Math.max(ws.zA, D.zP + D.lipH + D.lipC + 0.4);
+    ws.band = ws.zB - ws.zA >= 2 * ws.STEP + res;
 
-    /* Columns: a fixed number per side and per corner, taken from the
-       widest outline, so every row has the same count and rows join up. */
+    /* Columns round the widest outline: a fixed number per side and corner, so
+       every row has the same count and rows join up. */
     var Rr = Math.max(R, EPS_R);
-    var ax0 = Math.max(0, W / 2 - Rr), ay0 = Math.max(0, L / 2 - Rr);
+    var ax0 = Math.max(0, W / 2 - Rr), ay0 = Math.max(0, L / 2 - Rr), arc = Rr * Math.PI / 2;
     var nX = Math.max(1, Math.ceil(2 * ax0 / res)), nY = Math.max(1, Math.ceil(2 * ay0 / res));
-    var nA = Math.max(2, Math.ceil(Rr * Math.PI / 2 / res));
-    var cols = [];   // [segment, fraction]
-    var seq = [['R', nY], ['TR', nA], ['T', nX], ['TL', nA], ['L', nY], ['BL', nA], ['B', nX], ['BR', nA]];
-    seq.forEach(function (sg) { for (var i = 0; i < sg[1]; i++) cols.push([sg[0], i / sg[1]]); });
-    var N = cols.length;
-
-    // Distance round the widest outline, per column: the u texture coordinate.
-    var arc = Rr * Math.PI / 2, segLen = { R: 2 * ay0, TR: arc, T: 2 * ax0, TL: arc, L: 2 * ay0, BL: arc, B: 2 * ax0, BR: arc };
-    var uCol = [], acc = 0, cur = null, start = 0;
-    cols.forEach(function (c) {
-      if (c[0] !== cur) { cur = c[0]; start = acc; acc += segLen[cur]; }
-      uCol.push(start + c[1] * segLen[cur]);
+    var nA = Math.max(2, Math.ceil(arc / res));
+    ws.segs = [['R', nY, 2 * ay0], ['TR', nA, arc], ['T', nX, 2 * ax0], ['TL', nA, arc],
+               ['L', nY, 2 * ay0], ['BL', nA, arc], ['B', nX, 2 * ax0], ['BR', nA, arc]];
+    ws.cols = []; ws.uCol = [];
+    var acc = 0;
+    ws.segs.forEach(function (sg) {
+      for (var i = 0; i < sg[1]; i++) { ws.cols.push([sg[0], i / sg[1]]); ws.uCol.push(acc + sg[2] * i / sg[1]); }
+      acc += sg[2];
     });
-    var perimeter = acc;
+    ws.perimeter = acc;
 
     /* A point of the outline inset by `ins` (corner radius shrinks with it),
        with its outward normal. Corners never go below EPS_R, so columns stay
        distinct even where the requested corner is sharp. */
-    function at(c, ins) {
+    ws.at = function (c, ins) {
       var hx = W / 2 - ins, hy = L / 2 - ins;
       var r = CS.clamp(R - ins, EPS_R, Math.max(EPS_R, Math.min(hx, hy) - 1e-3));
-      var ax = Math.max(0, hx - r), ay = Math.max(0, hy - r), f = c[1], a;
+      var ax = Math.max(0, hx - r), ay = Math.max(0, hy - r), f = c[1], an;
       switch (c[0]) {
         case 'R':  return [ax + r, -ay + 2 * ay * f, 1, 0, r, false];
         case 'T':  return [ax - 2 * ax * f, ay + r, 0, 1, r, false];
         case 'L':  return [-ax - r, ay - 2 * ay * f, -1, 0, r, false];
         case 'B':  return [-ax + 2 * ax * f, -ay - r, 0, -1, r, false];
-        case 'TR': a = f * Math.PI / 2; return [ax + r * Math.cos(a), ay + r * Math.sin(a), Math.cos(a), Math.sin(a), r, true];
-        case 'TL': a = Math.PI / 2 + f * Math.PI / 2; return [-ax + r * Math.cos(a), ay + r * Math.sin(a), Math.cos(a), Math.sin(a), r, true];
-        case 'BL': a = Math.PI + f * Math.PI / 2; return [-ax + r * Math.cos(a), -ay + r * Math.sin(a), Math.cos(a), Math.sin(a), r, true];
-        default:   a = 1.5 * Math.PI + f * Math.PI / 2; return [ax + r * Math.cos(a), -ay + r * Math.sin(a), Math.cos(a), Math.sin(a), r, true];
+        case 'TR': an = f * Math.PI / 2; return [ax + r * Math.cos(an), ay + r * Math.sin(an), Math.cos(an), Math.sin(an), r, true];
+        case 'TL': an = Math.PI / 2 + f * Math.PI / 2; return [-ax + r * Math.cos(an), ay + r * Math.sin(an), Math.cos(an), Math.sin(an), r, true];
+        case 'BL': an = Math.PI + f * Math.PI / 2; return [-ax + r * Math.cos(an), -ay + r * Math.sin(an), Math.cos(an), Math.sin(an), r, true];
+        default:   an = 1.5 * Math.PI + f * Math.PI / 2; return [ax + r * Math.cos(an), -ay + r * Math.sin(an), Math.cos(an), Math.sin(an), r, true];
       }
-    }
-
-    var sideOf = function (nx, ny) {
+    };
+    // The same, at a distance u round the outline (for the atlas).
+    ws.atU = function (u, ins) {
+      u = ((u % ws.perimeter) + ws.perimeter) % ws.perimeter;
+      for (var i = 0; i < ws.segs.length; i++) {
+        var sg = ws.segs[i];
+        if (u <= sg[2] || i === ws.segs.length - 1) return ws.at([sg[0], sg[2] > 0 ? CS.clamp(u / sg[2], 0, 1) : 0], ins);
+        u -= sg[2];
+      }
+    };
+    ws.sideOf = function (nx, ny) {
       return Math.abs(nx) >= Math.abs(ny) ? (nx > 0 ? 'right' : 'left') : (ny > 0 ? 'back' : 'front');
     };
-    var samplers = {};
-    ['front', 'back', 'left', 'right'].forEach(function (k2) {
-      if (pats[k2]) samplers[k2] = CS.texSampler(pats[k2], T.scale, T.angle, perimeter);
+    ws.samplers = {};
+    ['front', 'back', 'left', 'right'].forEach(function (k) {
+      if (pats[k]) ws.samplers[k] = CS.texSampler(pats[k], T.scale, T.angle, ws.perimeter);
     });
-
-    var verts = [], disp = [], vu = [], vf = [];
-    var push = function (x, y, z, d, u, f) {
-      verts.push(x, y, z); disp.push(d || 0); vu.push(u || 0); vf.push(f || null);
-      return verts.length / 3 - 1;
-    };
-    var ringIdx = [];
-
     var zones = D.plainZones || [];
-    function plainAt(side, x, y, z) {
-      var a = side === 'front' || side === 'back' ? x : y;
+    ws.plainAt = function (side, x, y, z) {
+      var a2 = side === 'front' || side === 'back' ? x : y;
       for (var q = 0; q < zones.length; q++) {
         var Z = zones[q];
-        if (Z.side === side && a >= Z.a0 && a <= Z.a1 && z >= Z.z0 && z <= Z.z1) return true;
+        if (Z.side === side && a2 >= Z.a0 && a2 <= Z.a1 && z >= Z.z0 && z <= Z.z1) return true;
       }
       return false;
-    }
+    };
+    /* The pattern at a wall point: its raw depth below the high points `d`
+       (for choosing diagonals), and `g`, how far the surface actually moves
+       in (raise and the wall cap applied). Zero outside the band, on plain
+       patches and on untextured sides. `sample` filters or not. */
+    ws.disp = function (p, u, z, sample) {
+      if (!ws.band || z < ws.zA + ws.STEP - 1e-9 || z > ws.zB - ws.STEP + 1e-9) return null;
+      var side = ws.sideOf(p[2], p[3]), f = ws.samplers[side];
+      if (!f || ws.plainAt(side, p[0], p[1], z)) return null;
+      var d = ws.depth * sample(f, u, z);
+      return { d: d, g: Math.min(d - ws.raise[side], ws.inCap), f: f };
+    };
+    return ws;
+  }
 
+  function texturedShell(S, D, state, half, pats, res, props) {
+    var style = state.outer.edgeStyle;
+    var ws = wallSetup(D, state, half, pats, res), isBase = ws.isBase;
+    var fine = CS.texEngine(state) === 'fine' && !props;
+    var sample = fine ? function (f, u, v) { return lightFilter(f, u, v, res); }
+                      : function (f, u, v) { return filtered(f, u, v, res); };
+
+    /* Rows up the side: [z, inset, plain]. Fillet rows follow the edge
+       profile; the band gets evenly spaced rows `res` apart. */
+    var rows = [], fil = filletSteps(isBase ? D.eb : D.et, style, D.seg);
+    if (isBase) fil.forEach(function (f) { if (f[0] < ws.zLo - 1e-6) rows.push([f[0], f[1] + ws.taper(f[0]), true]); });
+    if (!ws.band) {
+      rows.push([ws.zLo, ws.taper(ws.zLo), true], [ws.zHi, ws.taper(ws.zHi), true]);
+    } else {
+      if (ws.zA > ws.zLo + 1e-6) rows.push([ws.zLo, ws.taper(ws.zLo), true]);
+      rows.push([ws.zA, ws.taper(ws.zA), true]);
+      var a0 = ws.zA + ws.STEP, b0 = ws.zB - ws.STEP, nz = Math.max(1, Math.ceil((b0 - a0) / res));
+      for (var k = 0; k <= nz; k++) { var z = a0 + (b0 - a0) * k / nz; rows.push([z, ws.taper(z), false]); }
+      rows.push([ws.zB, ws.taper(ws.zB), true]);
+      if (ws.zB < ws.zHi - 1e-6) rows.push([ws.zHi, ws.taper(ws.zHi), true]);
+    }
+    if (!isBase) fil.slice().reverse().forEach(function (f) {
+      var zz = D.zT - f[0];
+      if (zz > ws.zHi + 1e-6) rows.push([zz, f[1] + ws.taper(zz), true]);
+    });
+
+    var N = ws.cols.length, atlas = props && props.atlas;
+    var verts = [], disp = [], vu = [], vf = [];
+    var push = function (x, y, z, d, u, f, pr) {
+      verts.push(x, y, z);
+      if (props) {
+        if (pr) verts.push(pr[0], pr[1], pr[2], pr[3], pr[4], pr[5], pr[6], pr[7], pr[8]);
+        else verts.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
+      }
+      disp.push(d || 0); vu.push(u || 0); vf.push(f || null);
+      return disp.length - 1;
+    };
+    // Atlas coordinates and shading frame for a wall vertex.
+    var wallProps = function (p, u, z, band) {
+      if (!atlas || !band) return null;
+      return [atlas.wallU(u), atlas.wallV(z), p[2], p[3], 0, -p[3], p[2], 0, 1];
+    };
+
+    var mergeFrom = [], mergeTo = [];
     function sideRing(z, ins, plain) {
-      var idx = new Array(N);
-      var fz = plain ? 0 : 1;
-      for (var j = 0; j < N; j++) {
-        var p = at(cols[j], ins), x = p[0], y = p[1];
-        var side = sideOf(p[2], p[3]), f = fz > 0 && !plainAt(side, x, y, z) ? samplers[side] : null, d = 0;
-        if (f) {
-          // d is the pattern's depth below its high points (used to choose
-          // quad diagonals); the surface moves in by d less the raise.
-          d = depth * fz * filtered(f, uCol[j], z, res);
-          var g = Math.min(d - raiseOf[side], inCap);
-          // Round a tight corner, an inward push bigger than the radius
-          // would turn the surface inside out.
+      var idx = new Array(props ? N + 1 : N);
+      for (var j = 0; j <= N; j++) {
+        if (j === N && !props) break;
+        var jj = j % N, p = ws.at(ws.cols[jj], ins), x = p[0], y = p[1];
+        var u = j === N ? ws.perimeter : ws.uCol[jj];
+        var r = plain ? null : ws.disp(p, ws.uCol[jj], z, sample);
+        var g = 0;
+        if (r) {
+          g = r.g;
+          // Round a tight corner, an inward push bigger than the radius would
+          // turn the surface inside out.
           if (p[5] && g > 0) g = Math.min(g, p[4] * 0.85);
           x -= p[2] * g; y -= p[3] * g;
         }
-        idx[j] = push(x, y, z, d, uCol[j], f && !p[5] ? f : null);
+        idx[j] = push(x, y, z, r ? r.d : 0, u, r && !p[5] ? r.f : null, wallProps(p, u, z, !plain));
+        // The column where u wraps is drawn twice (u = perimeter and u = 0) so
+        // atlas coordinates never interpolate across the whole strip; Manifold
+        // is told the two are one vertex.
+        if (j === N) { mergeFrom.push(idx[j]); mergeTo.push(idx[0]); }
       }
       return idx;
     }
 
     // Depth the pattern really has at the middle of a quad, or null when the
-    // quad isn't wholly in one textured side (then any split will do).
-    var mid = function (a, b, c, d) {
-      var f = vf[a];
-      if (!f || vf[b] !== f || vf[c] !== f || vf[d] !== f) return null;
-      var ub = vu[b] < vu[a] ? vu[b] + perimeter : vu[b];      // the column that wraps round
-      return depth * filtered(f, (vu[a] + ub) / 2, (verts[a * 3 + 2] + verts[d * 3 + 2]) / 2, res);
+    // quad isn't wholly in one textured side.
+    var mid = function (a2, b2, c2, d2) {
+      var f = vf[a2];
+      if (!f || vf[b2] !== f || vf[c2] !== f || vf[d2] !== f) return null;
+      var ub = vu[b2] < vu[a2] ? vu[b2] + ws.perimeter : vu[b2];
+      return ws.depth * sample(f, (vu[a2] + ub) / 2, (verts[a2 * (props ? NP : 3) + 2] + verts[d2 * (props ? NP : 3) + 2]) / 2);
     };
 
-    // Assemble: bottom pole, side rows, top pole. Faces are flat here; a
-    // textured face is stamped afterwards (faceStamp).
-    var zBot = rows[0][0], zTop = rows[rows.length - 1][0];
+    var zBot = rows[0][0], zTop = rows[rows.length - 1][0], ringIdx = [];
     var botPole = push(0, 0, zBot);
-    rows.forEach(function (r) { ringIdx.push(sideRing(r[0], r[1], r[2])); });
+    rows.forEach(function (rw) { ringIdx.push(sideRing(rw[0], rw[1], rw[2])); });
     var topPole = push(0, 0, zTop);
 
-    var tris = [];
+    var tris = [], step = function (j) { return props ? j + 1 : (j + 1) % N; };
     var R0 = ringIdx[0];
-    for (var j = 0; j < N; j++) tris.push(botPole, R0[(j + 1) % N], R0[j]);
+    for (var j = 0; j < N; j++) tris.push(botPole, R0[step(j)], R0[j]);
     for (var rI = 0; rI < ringIdx.length - 1; rI++) {
       var A = ringIdx[rI], B = ringIdx[rI + 1];
       for (var j2 = 0; j2 < N; j2++) {
-        var j3 = (j2 + 1) % N;
+        var j3 = step(j2);
         quadSplit(tris, disp, A[j2], A[j3], B[j3], B[j2], mid(A[j2], A[j3], B[j3], B[j2]));
       }
     }
     var RL = ringIdx[ringIdx.length - 1];
-    for (var j4 = 0; j4 < N; j4++) tris.push(RL[j4], RL[(j4 + 1) % N], topPole);
+    for (var j4 = 0; j4 < N; j4++) tris.push(RL[j4], RL[step(j4)], topPole);
 
-    var mesh = new WASM.Mesh({ numProp: 3, vertProperties: new Float32Array(verts), triVerts: new Uint32Array(tris) });
-    var m = S.k(new WASM.Manifold(mesh));
+    var opts = { numProp: props ? NP : 3, vertProperties: new Float32Array(verts), triVerts: new Uint32Array(tris) };
+    if (mergeFrom.length) { opts.mergeFromVert = new Uint32Array(mergeFrom); opts.mergeToVert = new Uint32Array(mergeTo); }
+    var m = S.k(new WASM.Manifold(new WASM.Mesh(opts)));
     if (m.status() !== 'NoError' || m.isEmpty()) throw new Error('Texture produced an invalid surface (' + m.status() + ').');
     return m;
   }
@@ -703,20 +753,89 @@ window.CS = window.CS || {};
     else tris.push(a, b, d, b, c, d);
   }
 
-  /* The pattern averaged over the whole grid cell (3 × 3 taps): a crisp edge
-     in the pattern becomes a ramp one cell wide, so an edge at any angle to
-     the grid comes out smooth instead of as a staircase. */
+  /* Classic: the pattern averaged over the whole grid cell (3 × 3 taps), so
+     a crisp edge becomes a ramp one cell wide instead of a staircase. */
   function filtered(f, u, v, res) {
     var h = res / 3, sum = 0;
     for (var i = -1; i <= 1; i++) for (var j = -1; j <= 1; j++) sum += f(u + i * h, v + j * h);
     return sum / 9;
   }
+  /* Fine: the grid is already far finer than any feature, so a light four-tap
+     average is enough to keep it from aliasing. */
+  function lightFilter(f, u, v, res) {
+    var h = res * 0.25;
+    return (f(u - h, v - h) + f(u + h, v - h) + f(u - h, v + h) + f(u + h, v + h)) / 4;
+  }
 
-  /* The outer shell of a half: textured when asked, else the plain hull. */
-  function shellFor(S, D, state, half, style, notes, preview) {
+  /* ── height atlas (fine engine preview) ───────────────────────────── */
+  /* An image of how far the surface moves in, for one half: the textured
+     wall band unrolled (u round the perimeter × z) on top, the textured face
+     (x × y) below, at k texels per mm. The viewer reads it per pixel to shade
+     detail the light preview mesh doesn't carry. Values come from wallSetup's
+     disp() — the same function the export uses — so the two always agree.
+     Cached on everything that feeds it, so moving a compartment doesn't
+     recompute it. */
+  var atlasCache = {};
+  CS.textureAtlas = function (D, state, half, pats, res) {
+    var T = state.texture;
+    var key = JSON.stringify([half, pats, T.pattern, T.scale, T.angle, T.depth, T.raise, T.border, D.W, D.L, D.R,
+      D.zP, D.zT, D.eb, D.et, D.tanO, D.T0, D.lipOn, D.lipH, D.lipC, D.lipT, D.plainZones, D.top, D.bottom,
+      D.side, D.claspSide, D.tray, (CS.assets.texture && CS.assets.texture._rev) || 0]);
+    if (atlasCache[half] && atlasCache[half].key === key) return atlasCache[half].atlas;
+
+    var ws = wallSetup(D, state, half, pats, res);
+    var walls = !!(pats.front || pats.back || pats.left || pats.right) && ws.band;
+    var fo = CS.faceOutline(D, half), hasFace = !!pats.face;
+    var k = CS.clamp(48 / Math.max(0.5, T.scale), 5, 14);
+    k = Math.min(k, 4000 / Math.max(1, walls ? ws.perimeter : 1), 4000 / Math.max(1, fo.w));
+    var wallRows = walls ? Math.ceil((ws.zHi - ws.zLo) * k) + 3 : 0;
+    var faceRows = hasFace ? Math.ceil(fo.h * k) + 3 : 0;
+    var AW = Math.max(walls ? Math.ceil(ws.perimeter * k) + 3 : 1, hasFace ? Math.ceil(fo.w * k) + 3 : 1);
+    var AH = Math.max(1, wallRows + faceRows);
+    var data = new Float32Array(AW * AH), raw = function (f, u, v) { return f(u, v); };
+
+    if (walls) for (var j = 0; j < wallRows; j++) {
+      var z = ws.zLo + (j - 1) / k;
+      for (var i = 0; i < AW; i++) {
+        var u = (i - 1) / k, p = ws.atU(u, ws.taper(z)), r = ws.disp(p, u, z, raw);
+        if (!r) continue;
+        var g = r.g;
+        if (p[5] && g > 0) g = Math.min(g, p[4] * 0.85);
+        data[j * AW + i] = g;
+      }
+    }
+    if (hasFace) {
+      var depth = CS.clamp(T.depth, 0.05, 3), raise = texRaise(D, state).face, isBase = half === 'base';
+      var inCap = Math.max(0.05, (isBase ? D.bottom : D.top) - 0.8);
+      var f = CS.texSampler(pats.face, T.scale, T.angle), border = CS.clamp(T.border == null ? 1 : T.border, 0, 20);
+      var hx = fo.w / 2 - border, hy = fo.h / 2 - border, rr = Math.max(0, Math.min(fo.r, fo.w / 2, fo.h / 2) - border);
+      for (var jf = 0; jf < faceRows; jf++) {
+        var y = -fo.h / 2 + (jf - 1) / k;
+        for (var ifc = 0; ifc < AW; ifc++) {
+          var x = -fo.w / 2 + (ifc - 1) / k;
+          var qx = Math.abs(x) - (hx - rr), qy = Math.abs(y) - (hy - rr);
+          if (Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) > rr) continue;
+          data[(wallRows + jf) * AW + ifc] = Math.min(depth * f(isBase ? -x : x, y) - raise, inCap);
+        }
+      }
+    }
+    var atlas = {
+      w: AW, h: AH, k: k, texelMM: 1 / k, data: data,
+      wallU: function (u) { return (u * k + 1.5) / AW; },
+      wallV: function (zz) { return ((zz - ws.zLo) * k + 1.5) / AH; },
+      faceU: function (xx) { return ((xx + fo.w / 2) * k + 1.5) / AW; },
+      faceV: function (yy) { return ((yy + fo.h / 2) * k + wallRows + 1.5) / AH; }
+    };
+    atlasCache[half] = { key: key, atlas: atlas };
+    return atlas;
+  };
+
+  /* The outer shell of a half: textured when asked, else the plain hull.
+     `atlas` (preview, fine engine) gets the half's height atlas attached. */
+  function shellFor(S, D, state, half, style, notes, preview, atlasOut) {
     var pats = texturePlan(D, state, half);
     if (!pats) return half === 'base' ? baseOuter(S, D, style) : lidOuter(S, D, style);
-    var res = CS.texResFor(state, preview);
+    var engine = CS.texEngine(state), res = CS.texResFor(state, preview);
     if (notes && !notes._tex) {
       notes._tex = true;
       var depth = CS.clamp(state.texture.depth, 0.05, 3), rz = texRaise(D, state);
@@ -738,11 +857,19 @@ window.CS = window.CS || {};
         notes.push({ level: 'ok', msg: 'The texture is deeper than the lid wall beside the lip, so on the lid it starts above the lip groove.' });
       }
     }
+
+    var shaded = preview && engine === 'fine';
+    var atlas = shaded ? CS.textureAtlas(D, state, half, pats, res) : null;
+    if (atlas && atlasOut) atlasOut[half] = atlas;
+    var props = atlas ? { atlas: atlas } : null;
+
     var walls = pats.front || pats.back || pats.left || pats.right;
-    var shell = walls ? texturedShell(S, D, state, half, pats, res)
+    var shell = walls ? texturedShell(S, D, state, half, pats, res, props)
                       : (half === 'base' ? baseOuter(S, D, style) : lidOuter(S, D, style));
+    // Fine export: oversampled, so thin it out wherever the surface is flat.
+    if (walls && engine === 'fine' && !preview) shell = S.k(shell.simplify(0.01));
     if (!pats.face) return shell;
-    var fr = faceRelief(S, D, state, half, pats.face, res);
+    var fr = faceRelief(S, D, state, half, pats.face, res, props);
     return fr ? union(S, [sub(S, shell, fr.cut), fr.add]) : shell;
   }
 
@@ -783,8 +910,11 @@ window.CS = window.CS || {};
      valleys, out for anything raised — so the pattern can sit in the face,
      flush with it, or stand proud of it, with a crisp edge all round.
      Returns { cut, add }, or null when there is no room. */
-  function faceRelief(S, D, state, half, pattern, res) {
+  function faceRelief(S, D, state, half, pattern, res, props) {
     var T = state.texture, depth = CS.clamp(T.depth, 0.05, 3), isBase = half === 'base';
+    var fine = CS.texEngine(state) === 'fine';
+    var sample = fine && !props ? lightFilter : filtered;
+    var atlas = props && props.atlas, np = props ? NP : 3;
     var raise = texRaise(D, state).face;
     var fo = CS.faceOutline(D, half), f = CS.texSampler(pattern, T.scale, T.angle);
     var z0 = isBase ? 0 : D.zT, out = isBase ? -1 : 1;
@@ -802,10 +932,15 @@ window.CS = window.CS || {};
       for (var j = 0; j <= ny; j++) for (var i = 0; i <= nx; i++) {
         var x = -hx + fo.w * i / nx, y = -hy + fo.h * j / ny, d = 0, z = zFloor;
         if (surf) {
-          d = depth * filtered(f, isBase ? -x : x, y, res);
+          d = depth * sample(f, isBase ? -x : x, y, res);
           z = z0 + out * Math.max(raise - d, -inCap);
         }
         verts.push(x, y, z);
+        if (props) {
+          // kind 2 = lid top, 3 = underside (its atlas runs the other way round)
+          if (surf && atlas) verts.push(atlas.faceU(x), atlas.faceV(y), 0, 0, out, 1, 0, 0, isBase ? 3 : 2);
+          else verts.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
+        }
         disp.push(d);
       }
     });
@@ -813,7 +948,7 @@ window.CS = window.CS || {};
     for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) {
       var cxm = -hx + fo.w * (i + 0.5) / nx, cym = -hy + fo.h * (j + 0.5) / ny;
       quadSplit(tris, disp, id(i, j, true), id(i + 1, j, true), id(i + 1, j + 1, true), id(i, j + 1, true),
-                depth * filtered(f, isBase ? -cxm : cxm, cym, res));
+                depth * sample(f, isBase ? -cxm : cxm, cym, res));
       quad(id(i, j, false), id(i, j + 1, false), id(i + 1, j + 1, false), id(i + 1, j, false));
     }
     for (var i2 = 0; i2 < nx; i2++) {
@@ -825,12 +960,13 @@ window.CS = window.CS || {};
       quad(id(nx, j2, true), id(nx, j2, false), id(nx, j2 + 1, false), id(nx, j2 + 1, true));
     }
     // One consistent winding was used throughout; flip it if it came out inside-out.
-    if (signedVolume(verts, tris) < 0) {
+    if (signedVolume(np === 3 ? verts : verts.filter(function (_, k) { return k % np < 3; }), tris) < 0) {
       for (var t = 0; t < tris.length; t += 3) { var sw = tris[t + 1]; tris[t + 1] = tris[t + 2]; tris[t + 2] = sw; }
     }
-    var mesh = new WASM.Mesh({ numProp: 3, vertProperties: new Float32Array(verts), triVerts: new Uint32Array(tris) });
+    var mesh = new WASM.Mesh({ numProp: np, vertProperties: new Float32Array(verts), triVerts: new Uint32Array(tris) });
     var block = S.k(new WASM.Manifold(mesh));
     if (block.status() !== 'NoError' || block.volume() <= 0) throw new Error('Face texture produced an invalid surface (' + block.status() + ').');
+    if (fine && !props) block = S.k(block.simplify(0.01));
     var lo = z0 - out * below, hi = z0 + out * (raise + depth + 2);
     var outline = [rrect(bw, bh, Math.max(0, r - border), 0, 0, D.seg)];
     // The block reaches 0.01 mm past the cut, so it overlaps the face round
@@ -1067,7 +1203,8 @@ window.CS = window.CS || {};
       var interiorPrism = prism(S, [interiorRing(D)], D.zP - D.Hb - 2, D.zT + 2);
 
       /* Base: shell (textured, if asked) + lip, minus pockets and notches. */
-      var base = shellFor(S, D, state, 'base', style, warnings0, opts.preview);
+      var atlases = {};
+      var base = shellFor(S, D, state, 'base', style, warnings0, opts.preview, atlases);
       if (D.lipOn) {
         var b = D.T0 / 2 + D.lipC / 2;
         // Starts inside the wall, not on its top face: a union of two coincident
@@ -1098,7 +1235,7 @@ window.CS = window.CS || {};
          A tray has none. */
       var lid = null, lidShell = null, lidCav = null;
       if (!D.tray) {
-        lidShell = shellFor(S, D, state, 'lid', style, warnings0, opts.preview);
+        lidShell = shellFor(S, D, state, 'lid', style, warnings0, opts.preview, atlases);
         lidCav = loft(S, [lift(interiorRing(D), D.zP - 1), lift(interiorRing(D, D.Ht * D.tanO), D.zP + D.Ht)], true);
         lid = sub(S, lidShell, lidCav);
         if (D.lipOn) {
@@ -1152,7 +1289,7 @@ window.CS = window.CS || {};
       parts.forEach(function (p) { colours[p.colorIndex] = 1; });
 
       return {
-        parts: parts, D: D, warnings: warnings,
+        parts: parts, D: D, warnings: warnings, atlas: atlases,
         stats: { tris: tris, vol: vol, w: D.W, l: D.L, h: D.zT + (D.grid ? D.grid.foot : 0),
                  colors: Object.keys(colours).length,
                  base: D.zP, lid: D.zT - D.zP }
@@ -1175,14 +1312,15 @@ window.CS = window.CS || {};
   function toPart(m, key, label, color, half) {
     var mesh = m.getMesh();
     var np = mesh.numProp, vp = mesh.vertProperties, nv = vp.length / np;
-    var pos = new Float32Array(nv * 3);
+    var pos = new Float32Array(nv * 3), tex = np >= NP ? new Float32Array(nv * 9) : null;
     for (var i = 0; i < nv; i++) {
       pos[i * 3] = vp[i * np]; pos[i * 3 + 1] = vp[i * np + 1]; pos[i * 3 + 2] = vp[i * np + 2];
+      if (tex) for (var q = 0; q < 9; q++) tex[i * 9 + q] = vp[i * np + 3 + q];
     }
     return {
       key: key, label: label, half: half,
       colorIndex: (color || '#000000').toUpperCase(), color: color,
-      positions: pos, indices: new Uint32Array(mesh.triVerts),
+      positions: pos, indices: new Uint32Array(mesh.triVerts), tex: tex,
       volume: m.volume(), status: m.status()
     };
   }

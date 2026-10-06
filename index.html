@@ -241,6 +241,15 @@
               <tr><th>Face</th><td><select class="texsel" data-bind="texture.sides.base.face"></select></td><td data-hide="build:tray"><select class="texsel" data-bind="texture.sides.lid.face"></select></td></tr>
             </tbody>
           </table>
+          <div class="row">
+            <span class="lbl">Texture engine</span>
+            <div class="seg small full" role="group" aria-label="Texture engine" data-bind="texture.engine">
+              <button value="fine" title="Per-pixel preview; export oversampled then simplified">Fine</button>
+              <button value="classic" title="The previous method: one mesh density for preview and export">Classic</button>
+            </div>
+          </div>
+          <p class="hint" data-show="texture.engine:fine">Fine shades the preview per pixel from the exact texture, and
+            exports a much finer surface simplified to within 0.01 mm. Exports take a few seconds longer.</p>
           <p class="hint">Face is the base underside and the lid top. Texture stops with a crisp edge, a plain border
             short of rounded edges, the parting line and the face outline, so the halves still meet cleanly;
             decoration is cut through it. It makes much bigger

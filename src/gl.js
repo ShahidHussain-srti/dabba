@@ -13,25 +13,59 @@ window.CS = window.CS || {};
     'attribute vec3 aPos;',
     'attribute vec3 aNormal;',
     'attribute vec3 aColor;',
+    'attribute vec2 aTex;',      // height-atlas coordinates (textured surfaces only)
+    'attribute vec3 aBN;',       // the surface's normal before texturing
+    'attribute vec3 aTa;',       // tangent along the atlas u axis
+    'attribute float aKind;',    // 0 plain, 1 wall, 2 lid top, 3 underside
     'uniform mat4 uProj;',
     'uniform mat4 uView;',
     'varying vec3 vN;',
     'varying vec3 vC;',
     'varying vec3 vP;',
+    'varying vec2 vTex;',
+    'varying vec3 vBN;',
+    'varying vec3 vTa;',
+    'varying float vKind;',
     'void main(){',
     '  vN = aNormal; vC = aColor; vP = aPos;',
+    '  vTex = aTex; vBN = aBN; vTa = aTa; vKind = aKind;',
     '  gl_Position = uProj * uView * vec4(aPos, 1.0);',
     '}'
   ].join('\n');
 
+  /* Textured surfaces are shaded per pixel from the height atlas:
+     the light preview mesh gives the shape, and the normal
+     at every pixel comes from the atlas gradient around the surface's own
+     untextured normal. Height h is how far the surface moves in, so the
+     normal is N + dh/da·Ta + dh/db·Tb (a, b the atlas axes, in mm). */
   var FS = [
     'precision highp float;',
     'varying vec3 vN;',
     'varying vec3 vC;',
     'varying vec3 vP;',
+    'varying vec2 vTex;',
+    'varying vec3 vBN;',
+    'varying vec3 vTa;',
+    'varying float vKind;',
     'uniform vec3 uEye;',
+    'uniform sampler2D uAtlas;',
+    'uniform float uBump;',      // 1 when this draw has an atlas
+    'uniform vec2 uTexel;',      // one texel in atlas coordinates
+    'uniform float uTexelMM;',   // one texel in millimetres
+    'uniform float uHScale;',    // atlas value → millimetres
     'void main(){',
     '  vec3 n = normalize(vN);',
+    '  if (uBump > 0.5 && vKind > 0.5) {',
+    '    float hL = texture2D(uAtlas, vTex - vec2(uTexel.x, 0.0)).r;',
+    '    float hR = texture2D(uAtlas, vTex + vec2(uTexel.x, 0.0)).r;',
+    '    float hD = texture2D(uAtlas, vTex - vec2(0.0, uTexel.y)).r;',
+    '    float hU = texture2D(uAtlas, vTex + vec2(0.0, uTexel.y)).r;',
+    '    float ga = (hR - hL) * uHScale / (2.0 * uTexelMM);',
+    '    float gb = (hU - hD) * uHScale / (2.0 * uTexelMM);',
+    '    vec3 N = normalize(vBN), Ta = normalize(vTa);',
+    '    vec3 Tb = cross(N, Ta) * (vKind > 2.5 ? -1.0 : 1.0);',
+    '    n = normalize(N + ga * Ta + gb * Tb);',
+    '  }',
     '  vec3 v = normalize(uEye - vP);',
     '  vec3 l1 = normalize(vec3(0.45, -0.7, 1.0));',
     '  vec3 l2 = normalize(vec3(-0.8, 0.5, 0.35));',
@@ -137,8 +171,20 @@ window.CS = window.CS || {};
       col: gl.getAttribLocation(this.prog, 'aColor'),
       proj: gl.getUniformLocation(this.prog, 'uProj'),
       view: gl.getUniformLocation(this.prog, 'uView'),
-      eye: gl.getUniformLocation(this.prog, 'uEye')
+      eye: gl.getUniformLocation(this.prog, 'uEye'),
+      tex: gl.getAttribLocation(this.prog, 'aTex'),
+      bn: gl.getAttribLocation(this.prog, 'aBN'),
+      ta: gl.getAttribLocation(this.prog, 'aTa'),
+      kind: gl.getAttribLocation(this.prog, 'aKind'),
+      atlas: gl.getUniformLocation(this.prog, 'uAtlas'),
+      bump: gl.getUniformLocation(this.prog, 'uBump'),
+      texel: gl.getUniformLocation(this.prog, 'uTexel'),
+      texelMM: gl.getUniformLocation(this.prog, 'uTexelMM'),
+      hscale: gl.getUniformLocation(this.prog, 'uHScale')
     };
+    // Float atlases when the GPU filters them, else 8-bit with a scale.
+    this.floatTex = !!(gl.getExtension('OES_texture_float') && gl.getExtension('OES_texture_float_linear'));
+    this.atlasTex = {};
     this.lprog = program(gl, LVS, LFS);
     this.lloc = {
       pos: gl.getAttribLocation(this.lprog, 'aPos'),
@@ -225,10 +271,40 @@ window.CS = window.CS || {};
     this.onPick(hit, { x: x, y: y });
   };
 
-  CS.Viewer.prototype.setModel = function (parts, D) {
+  CS.Viewer.prototype.setModel = function (parts, D, atlas) {
     this.parts = parts || [];
     this.D = D;
+    this._setAtlases(atlas || {});
     this._upload();
+  };
+
+  /* One GPU texture per half, re-uploaded only when the atlas itself changed
+     (the geometry cache hands back the same object when nothing fed it). */
+  CS.Viewer.prototype._setAtlases = function (atlas) {
+    var gl = this.gl, self = this;
+    ['base', 'lid'].forEach(function (half) {
+      var a = atlas[half], cur = self.atlasTex[half];
+      if (!a) { self.atlasTex[half] = null; return; }
+      if (cur && cur.src === a) return;
+      var tex = (cur && cur.tex) || gl.createTexture(), scale = 1, offset = 0;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      if (self.floatTex) {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, a.w, a.h, 0, gl.LUMINANCE, gl.FLOAT, a.data);
+      } else {
+        var lo = Infinity, hi = -Infinity, i;
+        for (i = 0; i < a.data.length; i++) { if (a.data[i] < lo) lo = a.data[i]; if (a.data[i] > hi) hi = a.data[i]; }
+        scale = Math.max(1e-6, hi - lo); offset = lo;
+        var bytes = new Uint8Array(a.data.length);
+        for (i = 0; i < a.data.length; i++) bytes[i] = Math.round((a.data[i] - lo) / scale * 255);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, a.w, a.h, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, bytes);
+      }
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      self.atlasTex[half] = { src: a, tex: tex, w: a.w, h: a.h, texelMM: a.texelMM, hscale: scale, offset: offset };
+    });
   };
 
   CS.Viewer.prototype.setPose = function (mode, angle) {
@@ -261,27 +337,41 @@ window.CS = window.CS || {};
     this.bodyCount = bodyTris * 3;
     if (!tris) { this.bounds = null; return; }
 
-    var data = new Float32Array(tris * 3 * 9);
-    var o = 0;
+    var STRIDE = 18, data = new Float32Array(tris * 3 * STRIDE);
+    var o = 0, ranges = [];
+    this.stride = STRIDE;
     var minX = Infinity, minY = Infinity, minZ = Infinity;
     var maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
     parts.forEach(function (part) {
       var pose = self.D ? CS.poseFor(self.D, part, self.mode, self.angle) : null;
       var rgb = CS.hexToRgb(part.color);
-      var p = part.positions, ix = part.indices, cn = cornerNormals(part);
+      var p = part.positions, ix = part.indices, cn = cornerNormals(part), tx = part.tex;
+      // Poses are rigid, so a direction turns with the point it sits on.
+      var turn = function (q, x0, y0, z0, vx, vy, vz) {
+        var e = pose(x0 + vx, y0 + vy, z0 + vz);
+        return [e[0] - q[0], e[1] - q[1], e[2] - q[2]];
+      };
+      ranges.push({ start: o / STRIDE, count: ix.length, half: part.half, tex: !!tx });
       for (var i = 0; i < ix.length; i++) {
         var a = ix[i] * 3, x = p[a], y = p[a + 1], z = p[a + 2];
         var nx = cn[i * 3], ny = cn[i * 3 + 1], nz = cn[i * 3 + 2];
+        var t9 = tx ? ix[i] * 9 : -1;
+        var bn = t9 >= 0 ? [tx[t9 + 2], tx[t9 + 3], tx[t9 + 4]] : [0, 0, 1];
+        var ta = t9 >= 0 ? [tx[t9 + 5], tx[t9 + 6], tx[t9 + 7]] : [1, 0, 0];
         if (pose) {
-          // Poses are rigid, so a normal turns with the point it sits on.
-          var q = pose(x, y, z), qn = pose(x + nx, y + ny, z + nz);
-          nx = qn[0] - q[0]; ny = qn[1] - q[1]; nz = qn[2] - q[2];
+          var q = pose(x, y, z), qn = turn(q, x, y, z, nx, ny, nz);
+          if (t9 >= 0) { bn = turn(q, x, y, z, bn[0], bn[1], bn[2]); ta = turn(q, x, y, z, ta[0], ta[1], ta[2]); }
+          nx = qn[0]; ny = qn[1]; nz = qn[2];
           x = q[0]; y = q[1]; z = q[2];
         }
         data[o++] = x; data[o++] = y; data[o++] = z;
         data[o++] = nx; data[o++] = ny; data[o++] = nz;
         data[o++] = rgb[0]; data[o++] = rgb[1]; data[o++] = rgb[2];
+        data[o++] = t9 >= 0 ? tx[t9] : 0; data[o++] = t9 >= 0 ? tx[t9 + 1] : 0;
+        data[o++] = bn[0]; data[o++] = bn[1]; data[o++] = bn[2];
+        data[o++] = ta[0]; data[o++] = ta[1]; data[o++] = ta[2];
+        data[o++] = t9 >= 0 ? tx[t9 + 8] : 0;
         if (x < minX) minX = x; if (x > maxX) maxX = x;
         if (y < minY) minY = y; if (y > maxY) maxY = y;
         if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
@@ -290,6 +380,7 @@ window.CS = window.CS || {};
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
     gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    this.ranges = ranges;
 
     this.bounds = { minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ };
     this.center = [(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2];
@@ -374,20 +465,32 @@ window.CS = window.CS || {};
     gl.uniform3fv(this.loc.eye, new Float32Array(eye));
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
-    var stride = 9 * 4;
-    gl.enableVertexAttribArray(this.loc.pos);
-    gl.vertexAttribPointer(this.loc.pos, 3, gl.FLOAT, false, stride, 0);
-    gl.enableVertexAttribArray(this.loc.nrm);
-    gl.vertexAttribPointer(this.loc.nrm, 3, gl.FLOAT, false, stride, 12);
-    gl.enableVertexAttribArray(this.loc.col);
-    gl.vertexAttribPointer(this.loc.col, 3, gl.FLOAT, false, stride, 24);
+    var stride = (this.stride || 18) * 4, L = this.loc;
+    [[L.pos, 3, 0], [L.nrm, 3, 12], [L.col, 3, 24], [L.tex, 2, 36], [L.bn, 3, 44], [L.ta, 3, 56], [L.kind, 1, 68]]
+      .forEach(function (at) {
+        if (at[0] < 0) return;
+        gl.enableVertexAttribArray(at[0]);
+        gl.vertexAttribPointer(at[0], at[1], gl.FLOAT, false, stride, at[2]);
+      });
+    gl.uniform1i(L.atlas, 0);
+    gl.activeTexture(gl.TEXTURE0);
 
     /* No depth bias needed: an inlay fills a recess cut exactly to its shape,
        so it never shares a same-facing surface with the body. (A bias would
        pull the lid-top lettering through the lid at grazing angles.) */
-    gl.drawArrays(gl.TRIANGLES, 0, this.count);
-    gl.disableVertexAttribArray(this.loc.nrm);
-    gl.disableVertexAttribArray(this.loc.col);
+    var self = this;
+    (this.ranges || [{ start: 0, count: this.count }]).forEach(function (r) {
+      var at = r.tex && self.atlasTex[r.half];
+      gl.uniform1f(L.bump, at ? 1 : 0);
+      if (at) {
+        gl.bindTexture(gl.TEXTURE_2D, at.tex);
+        gl.uniform2f(L.texel, 1 / at.w, 1 / at.h);
+        gl.uniform1f(L.texelMM, at.texelMM);
+        gl.uniform1f(L.hscale, at.hscale);
+      }
+      gl.drawArrays(gl.TRIANGLES, r.start, r.count);
+    });
+    [L.nrm, L.col, L.tex, L.bn, L.ta, L.kind].forEach(function (a) { if (a >= 0) gl.disableVertexAttribArray(a); });
 
     if (this.lineCount) {
       gl.useProgram(this.lprog);
