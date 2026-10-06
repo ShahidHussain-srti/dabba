@@ -53,6 +53,90 @@ window.CS = window.CS || {};
 
   CS.shareBase = function () { return location.href.split('#')[0]; };
 
+  /* ── the popup under the Share button ─────────────────────────────
+     One at a time. Plain success fades after a few seconds (not while the
+     pointer is over it); anything that needs reading stays until closed.
+       opts: { anchor, kind: 'ok'|'warn', title, body, link, linkCopied } */
+  var pop = null, popTimer = 0;
+  CS.sharePopup = function (opts) {
+    closePopup();
+    var el = document.createElement('div');
+    el.className = 'sharepop ' + (opts.kind || 'ok');
+    el.setAttribute('role', 'status');
+    el.innerHTML =
+      '<div class="sp-head"><span class="sp-ic"></span><b></b>' +
+      '<button type="button" class="sp-x" aria-label="Close">✕</button></div>';
+    el.querySelector('.sp-ic').textContent = opts.kind === 'warn' ? '!' : '✓';
+    el.querySelector('b').textContent = opts.title;
+    if (opts.link) {
+      var row = document.createElement('div');
+      row.className = 'sp-link';
+      var inp = document.createElement('input');
+      inp.readOnly = true; inp.value = opts.link; inp.setAttribute('aria-label', 'Design link');
+      inp.addEventListener('focus', function () { inp.select(); });
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = opts.linkCopied ? 'Copy again' : 'Copy';
+      btn.addEventListener('click', function () {
+        CS.copyText(opts.link).then(function (ok) {
+          btn.textContent = ok ? 'Copied ✓' : 'Select and copy';
+          if (!ok) { inp.focus(); inp.select(); }
+        });
+      });
+      row.appendChild(inp); row.appendChild(btn);
+      el.appendChild(row);
+    }
+    (opts.body || []).forEach(function (b) {
+      var p = document.createElement('p');
+      p.className = 'sp-body' + (b.warn ? ' warn' : '');
+      p.textContent = b.text || b;
+      el.appendChild(p);
+    });
+    el.querySelector('.sp-x').addEventListener('click', closePopup);
+    document.body.appendChild(el);
+
+    // Under the anchor, right-aligned with it; centred at the top otherwise.
+    var a = opts.anchor && opts.anchor.getBoundingClientRect();
+    if (a) {
+      el.style.top = (a.bottom + 8) + 'px';
+      el.style.right = Math.max(8, window.innerWidth - a.right) + 'px';
+    } else {
+      el.classList.add('centred');
+    }
+    requestAnimationFrame(function () { el.classList.add('in'); });
+    pop = el;
+
+    var sticky = opts.kind === 'warn' || (opts.body || []).some(function (b) { return b.warn; }) ||
+                 (opts.link && !opts.linkCopied);
+    if (!sticky) {
+      var arm = function () { popTimer = setTimeout(closePopup, 4500); };
+      el.addEventListener('mouseenter', function () { clearTimeout(popTimer); });
+      el.addEventListener('mouseleave', arm);
+      arm();
+    }
+    return el;
+  };
+  function closePopup() {
+    clearTimeout(popTimer);
+    if (!pop) return;
+    var el = pop; pop = null;
+    el.classList.remove('in');
+    setTimeout(function () { el.remove(); }, 180);
+  }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePopup(); });
+  document.addEventListener('pointerdown', function (e) {
+    if (pop && !pop.contains(e.target) && !e.target.closest('#btn-share')) closePopup();
+  });
+
+  /* Brief "Copied" on the button itself, so it is obvious where to look. */
+  CS.flashButton = function (btn, text) {
+    if (!btn) return;
+    clearTimeout(btn._flash);
+    if (btn._label == null) btn._label = btn.textContent;
+    btn.textContent = text;
+    btn.classList.add('flash');
+    btn._flash = setTimeout(function () { btn.textContent = btn._label; btn.classList.remove('flash'); }, 1600);
+  };
+
   /* Put text on the clipboard; returns whether it worked (file:// and older
      browsers can refuse, and the caller then shows the link to copy by hand). */
   CS.copyText = function (text) {

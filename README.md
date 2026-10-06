@@ -1,150 +1,119 @@
-# Dabba — case studio
+# Dabba
 
-Design a hinged, two-piece case around objects you have already measured, and export a
-3D-printable multi-colour `.3mf`.
+**Try it here: https://shahidhussain-srti.github.io/dabba/**
 
-**Use it online: https://shahidhussain-srti.github.io/dabba/**
+Dabba is a little browser tool for designing 3D-printed cases around things you own. You
+measure the object, tell it what shape it is, and it builds a hinged box with a pocket that
+fits. When you're happy, export a multi-colour `.3mf` and send it to your slicer.
 
-No build step and nothing to install — **double-click `index.html`**. It works offline:
-the geometry engine ([Manifold](https://github.com/elalish/manifold)) is bundled in
-`vendor/` with its WebAssembly inlined.
+I started it because I wanted a proper case for a battery-powered air pump, and drawing one
+from scratch in CAD every time I need a box for something felt like too much work. It grew
+from there.
 
-## Controls
+Nothing to install and no build step. Use the link above, or download the repo and
+double-click `index.html`; it works offline too, because the geometry engine
+([Manifold](https://github.com/elalish/manifold)) is bundled in `vendor/`.
 
-- **Make**: a hinged case, or **base only**, which gives an open tray or insert with no
-  lid, hinge or clasps. Either can stand on a **Gridfinity base**. The footprint rounds
-  up to whole 42 mm units (less the standard 0.5 mm), with standard feet and optional
-  6 × 2 mm magnet holes. The extra width thickens walls, or grows compartments set to
-  Fill.
-- **Number fields**: type exact values, or drag sideways on a field's label or the edges
-  of its box to change it, as in Unity's inspector. Shift for big steps, Alt for fine.
+## What you can make
 
-- **Compartments**: as many as you like. Each one says what it **holds**, and the fit
-  clearance is added around it:
-  - **Box**, **Round / oval** and **Capsule**: sized by the object's width, length and
-    height.
-  - **Lying cylinder**: a torch, a bottle or a rolled cable, cradled in a round trough.
-  - **Stepped cylinder**: round sections of different sizes end to end on one axis, such
-    as a battery air pump's body, neck and nozzle, or a screwdriver. Add or remove sections.
-  - **Battery holder** (AA, AAA, C, D, 18650, 21700, CR123A, 9 V, coin cells), standing
-    or lying; **hex bit holder**; **card slots** for SD, microSD, USB sticks and CF. Rows,
-    counts, hold depth and walls are all adjustable.
-  - **Custom shapes**: build the pocket from boxes, ovals, capsules, hexagons and lying
-    cylinders. In the plan, drag a shape to move it, drag its corner square to resize it,
-    and drag its round handle to turn it (`[` and `]` turn by 15°). Each shape can have its
-    own depth, or follow the compartment's depth.
-  - **Pocket depth** is set per compartment. On automatic, shorter objects sit flush with
-    the rim; switch to *Reach the floor* to drop every pocket to the bottom.
-  - **Inner walls** are never thinner than the setting. Where neighbours differ in size,
-    the wall between them thickens to take up the slack. Set a compartment to **Fill** to
-    grow its cavity into that space instead.
-  - **Finger notches**: a round scoop on any side of a compartment, with its own width and
-    depth, so you can lift the object out.
-- **Plan view**: click a compartment to select it, drag an edge to resize it, use **+**
-  to add a neighbour on that side, and press Delete to remove one. Arrow keys move the
-  selection. Clicking the hinge, clasps or walls opens their settings.
-- **3D view**: Closed, Open (with a lid-angle slider) or Print layout. Click a compartment
-  to select it, even through a closed lid.
-- **Walls**: side, base floor, lid top and inner, each set separately.
-- **Edges & tapers**:
-  - Outside: corner radius, lid-top and base-bottom edge rounding (rounded or chamfered),
-    and an outer wall taper.
-  - Pockets: corner radius, floor rounding, rim round-over and a draft taper. Walls are
-    spaced so their thinnest point, at the top, still meets the inner-wall setting.
-- **Base / lid split**: any ratio, not just 50/50.
-- **Alignment lip**: the inner half of the base wall rises into a groove in the lid. It can
-  be switched off per edge. On an edge without it, the lid's groove is filled in too, so
-  base and lid meet flush on the inside. That's handy on the clasp side, where you reach
-  in.
-- **Lid interior**: open, or **mirror compartments**. Mirroring puts walls over the base's
-  walls and a pocket over every compartment, stopping a set gap above the base walls so
-  the lid closes cleanly. Near the hinge the walls also step back from the lip by the
-  sideways sweep the lid makes as it opens. Pockets run full height, or *fit to objects*
-  so they stop just above each object and hold it down.
-- **Hinge**: on any edge. Set how many hinges, knuckles per hinge, length, knuckle
-  diameter, pin hole, the gap between knuckles, swing clearance and inset from the
-  corners. The pin is a length of 1.75 mm filament.
-- **Clasps** on the edge opposite the hinge, any number:
-  - **Snap hook**: a flexible tab on the lid catches a slot in the base.
-  - **Hook latch**: a separate hook pivots on a filament pin through lugs on the lid and
-    drops over a second filament pin held by lugs on the base. The hook is exported as its
-    own object, lying on its side for printing.
-  - **Swing hook**: the jewellery-box kind. A flat hook turns on a filament pin set into a
-    boss on the lid, and its curved tip (an arc around the pin) threads through an eye on
-    the base. Turn the knob to open. The hook prints flat as its own piece; the eye has a
-    45° chin so it prints without supports.
-  - **Magnets**: pockets in the rim that meet face to face.
-  - **Snap bumps**: ridges on the lip click into dimples in the lid.
-- **Texture**: displacement patterns on the outside. There are 27 patterns:
-  knurl, pyramids, crosshatch, ribs, chevron, waves, hexagons, triangles, waffle, tiles,
-  checkerboard, bricks, herringbone, basket weave, diamond plate, fish scales, dimples,
-  studs, perforated, rings, bubbles, stone, crystal, leather, wood grain, topographic and
-  sand, or an uploaded image (dark is deep). Settings are depth, size, angle and **outer
-  depth**: at 0 the pattern is cut in with its high points flush; at the depth it stands
-  out with its low points flush; below 0 the whole pattern sinks into a recessed panel,
-  never closer than 0.8 mm to the inside. The hinge edge, and the clasp edge when a clasp hangs
-  there, always stay cut in so nothing rubs. Walls stay plain under hinge supports and
-  clasps. Each wall and face of
-  the base and lid can use the main pattern, another one, or none. Textured walls are built
-  as an even grid of columns round the outline and rows up it, and textured faces are
-  stamped with a regular x/y grid. With the **Fine** engine (default), the export samples about 30 times per repeat and Manifold then
-  simplifies to within 0.01 mm, so triangles stay dense only where the surface bends.
-  The preview builds a light mesh and shades it per pixel from a height atlas of the
-  same texture. **Classic** keeps the earlier single-density method.
-- **Decoration** on the lid top and the base underside, done the same way as Keychain
-  Studio: borders, any number of text boxes and pictures, one colour per element, and
-  inlay / engraved / raised per face.
+A hinged case with a base and a lid, or just the base on its own if you want an open tray
+or a drawer insert. Either one can sit on a **Gridfinity** base: the footprint rounds up to
+whole 42 mm units, and you get the standard feet and optional magnet holes.
 
-`⌘Z` / `Ctrl+Z` undoes anything. Your work survives a refresh; **Reset** starts over.
-**Save** / **Load** keep a design as JSON. **Share** copies a link that opens the design:
-the settings are packed into the link itself (after the `#`, so never sent to a server).
-Pictures and image textures are too big for a link and are left out — to share those,
-send the saved `.case.json` or the exported 3MF.
+### Compartments
+
+Add as many as you like and pick what each one holds. Fit clearance is added around
+whatever you choose.
+
+- **Box**, **round/oval** and **capsule** pockets, sized by width, length and height.
+- **Lying cylinder** for torches, bottles or a rolled-up cable, which rest in a round trough.
+- **Stepped cylinder** for things made of round sections end to end, like the air pump
+  (body, neck, nozzle) or a screwdriver. Add as many sections as you need.
+- **Battery holders** for AA, AAA, C, D, 18650, 21700, CR123A, 9 V and coin cells,
+  standing or lying down.
+- **Hex bit holders** and **card slots** for SD, microSD, USB sticks and CF cards.
+- **Custom shapes**, if none of those fit. Build the pocket out of boxes, ovals, capsules,
+  hexagons and cylinders. Drag them around in the plan, pull the yellow corner to resize,
+  grab the round handle to turn them (or press `[` and `]`), and give each one its own
+  depth if you like.
+
+Each compartment also gets its own pocket depth (by default shorter things sit flush with
+the rim) and optional finger notches so you can get the object back out. Inner walls never
+go below the thickness you set. Where neighbouring compartments are different sizes, the
+wall between them gets thicker, unless you set a compartment to *Fill* and let it grow
+into the space instead.
+
+### The box itself
+
+- Wall, floor and lid thicknesses set separately.
+- Rounded or chamfered outer edges, an outer taper, and rounded or tapered pockets.
+- Any base/lid split, not just half and half.
+- An alignment lip that can be turned off per edge, so the inside can be flush where
+  you reach in.
+- A lid that's either open inside or mirrors the base's compartments, so things are held
+  from above when it's shut.
+- A filament-pin hinge on any edge: count, knuckles, length, pin size and clearances are
+  all adjustable.
+- Clasps: snap hooks, magnets, snap bumps, a hook latch on its own pin, or a swing hook
+  like the ones on old jewellery boxes. The two hook types print as a separate small piece.
+
+### Texture and decoration
+
+There are 27 surface textures for the outside: knurling, hexagons, wood grain, leather,
+topographic lines and lots more, or upload your own height map.
+You can set depth, scale and angle, push the pattern out or sink it into a recessed panel, and
+pick a different pattern (or none) for each side. The plain bands at the top and bottom of
+each wall can be set separately too. Hinges and clasps always sit on a smooth surface.
+
+The lid top and the base underside can carry borders, text and pictures, the same way
+[Keychain Studio](https://shahidhussain-srti.github.io/keychains/) does it. Each element
+gets its own colour, set in, engraved or raised.
+
+### Getting around
+
+Click a compartment in the plan to select it, drag its edges to resize, use **+** to add a
+neighbour and Delete to remove one. The 3D view can show the case closed, open at any angle,
+or laid out for printing. Number boxes work like Unity's inspector: type a value, or drag
+sideways on the label or the edge of the box (Shift for bigger steps, Alt for finer).
+
+`⌘Z` / `Ctrl+Z` undoes anything, and your work survives a refresh. **Save** and **Load** keep
+a design as a `.case.json` file.
+
+**Share** copies a link that opens your design for whoever you send it to. Everything is
+packed into the link itself, after the `#`, so nothing gets uploaded anywhere. Pictures and
+image textures are too big to fit in a link, though, so if your design uses them, send the
+saved file or the exported 3MF instead.
 
 ## Printing
 
-The 3MF holds two objects (three with hook or swing latches), laid out for printing: the base upright, and the lid swung
-open 180° on its hinge so it lies top-down beside the base. Both decorated faces
-therefore print against the bed. That makes inlay crisp and flat, and it's why raised
-detail on those faces is flagged.
+The 3MF comes laid out ready to print: the base upright, and the lid flipped open beside
+it so its top is on the bed. Hook latches add a third small piece. Every part is a closed,
+watertight solid, and every height is a whole number of layers, so set the layer height to
+match your slicer.
 
-The file layout matches Keychain Studio, which follows how Bambu Studio writes a
-multi-colour file. Each colour is its own mesh object, gathered by an assembly object
-per printable piece. `Metadata/model_settings.config` keys each `<part>` by the
-component's objectid and gives it an extruder, which is what makes colour stick in Bambu
-Studio, OrcaSlicer and Creality Print. `Slic3r_PE_model.config` says the same thing as
-per-object triangle ranges for PrusaSlicer. Extruders are numbered densely from 1, in
-order of use.
+Colours are assigned the way Bambu Studio writes its own files, so they come through in
+Bambu Studio, OrcaSlicer, Creality Print and PrusaSlicer, numbered from extruder 1 in the
+order they're used. Base and lid are separate objects, so you can print them in different
+filaments on any printer. Multi-colour decoration needs an AMS, CFS or MMU.
 
-- **Base and lid** are separate objects, so they can be printed in different filaments on
-  any printer. Decoration colours need a multi-material printer (AMS / CFS / MMU).
-- Every height (floor, parting line, lid, lip, decoration depth) is a whole number of
-  layers. Set **layer height** to match your slicer.
-- **Hinge**: the knuckles have 45° chins and print without supports. Push filament
-  through the pin hole, then melt or trim the ends. If it's tight, ream the hole with a
-  2 mm drill or raise *Pin hole*.
-- **STL** exports both pieces in the same layout as a single-colour mesh.
+For the hinge, push a length of 1.75 mm filament through the knuckles and melt or trim
+the ends. If it's tight, run a 2 mm drill through or bump up *Pin hole*. The knuckles have
+45° undersides, so no supports are needed.
+
+**STL** gives you the same layout as a single-colour mesh.
 
 ## How it works
 
-Sizes flow up the compartment tree from the objects, and placement flows back down
-(`layout.js`). The case is then built as solids with Manifold, whose booleans always
-return watertight, oriented meshes (`geometry.js`):
+Compartment sizes flow up a tree from the objects and positions flow back down
+(`layout.js`). The solids are built with Manifold, whose booleans always come back
+watertight (`geometry.js`). Decoration reuses Keychain Studio's approach: draw each element
+to a mask, trace it into polygons, then extrude and cut it into the face. The 3D view shows
+the exact mesh that gets exported, so what you see is what you print.
 
-- Shells and tapered pockets are hulls of stacked rounded outlines.
-- Concave profiles, like a rim round-over, are unions of hulls between neighbouring
-  outlines.
-- The hinge and clasps are built in a frame turned so the hinge edge faces +y, then turned
-  back.
-
-Decoration reuses Keychain Studio's mask pipeline: raster → marching squares → polygons.
-The polygons are then extruded and cut into the face, with colour regions kept exclusive
-both in 2-D and as solids. The 3D view renders the exported mesh, so it can't drift from
-the file.
-
-`util` state · `layout` compartment tree + dimensions · `geometry` solids, posing ·
-`raster`/`edt`/`contour`/`shapes` decoration masks · `zip`/`export` 3MF + STL ·
-`gl` viewer · `plan` planner · `face` decoration editor · `drawpad` · `app` wiring
+Files in `src/`: `util` state, `items` compartment shapes, `layout` sizes and placement,
+`geometry` solids, `texture` surface patterns, `raster`/`edt`/`contour`/`shapes` decoration
+masks, `zip`/`export` 3MF and STL, `share` links, `gl` 3D view, `plan` the planner, `face`
+the decoration editor, `drawpad`, and `app` to wire it all up.
 
 ## Development
 
@@ -152,34 +121,23 @@ the file.
 npm install      # manifold-3d, for the tests and for re-vendoring
 npm test         # geometry, collision, layout and 3MF checks in node
 npm run vendor   # rebuild vendor/manifold.js after changing the manifold-3d version
-npm run render-stl -- case.stl case.png   # look at an export, facets as-is, no slicer needed
+npm run render-stl -- case.stl case.png   # look at an export without a slicer
 ```
 
-The tests are physical checks. For every hinge side and clasp type, they confirm that:
-
-- every part is a valid closed solid;
-- base and lid don't overlap when closed;
-- latch hooks clear both halves when closed and lie flat and apart for printing;
-- the lid swings through 180° without touching the base (snap hooks aside — catching is
-  their job);
-- the printed pieces are apart;
-- the 3MF meshes re-import as closed solids, with colour assignments keyed correctly.
+The tests check the physical things: every part is a valid closed solid, the base and lid
+don't overlap when shut, the lid swings a full 180° without hitting anything, latch hooks
+clear both halves, printed pieces don't touch, and the 3MF reads back with the right
+colours.
 
 ## License
 
 Copyright © 2026 shahidhussain2k13@gmail.com
 
-Dabba is free software: you can redistribute it and/or modify it under the terms of the
-**GNU General Public License** as published by the Free Software Foundation, either
-version 3 of the License, or (at your option) any later version. It is distributed in the
-hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE) for the full
-text.
-
-In short: anyone may use, change and share it, but anything they distribute that is built
-from it, including a modified copy hosted on a website, must also be released under the
-GPL with its source.
+Dabba is free software under the **GNU General Public License v3.0 or later**. You can
+use it, change it and share it. If you distribute something built from it, including
+hosting a modified copy on a website, that has to be GPL with its source available too.
+There's no warranty. See [LICENSE](LICENSE) for the full text.
 
 `vendor/manifold.js` is [Manifold](https://github.com/elalish/manifold), © The Manifold
-Authors, under the Apache License 2.0 ([vendor/LICENSE-manifold.txt](vendor/LICENSE-manifold.txt)).
-Apache-2.0 is compatible with GPL-3.0, and Manifold keeps its own license.
+Authors, under the Apache License 2.0 ([vendor/LICENSE-manifold.txt](vendor/LICENSE-manifold.txt)),
+which is compatible with the GPL.

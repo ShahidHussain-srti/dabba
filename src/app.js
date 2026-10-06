@@ -1357,21 +1357,25 @@
            (CS.assets.texture ? 1 : 0);
   }
   function shareLink() {
-    var pics = pictureCount();
+    var pics = pictureCount(), btn = $('#btn-share');
     var payload = { app: 'dabba', version: 1, state: JSON.parse(CS.serialize(state)), assets: {} };
     if (pics) payload.picturesLeftOut = pics;
     CS.shareEncode(payload).then(function (hash) {
       var url = CS.shareBase() + hash;
       return CS.copyText(url).then(function (ok) {
-        notice('ok', (ok ? 'Link copied — it opens this design. ' : 'Copy this link to share the design: ') +
-               (url.length > 8000 ? '(It is long; some chat apps may cut it short.) ' : ''), ok ? null : url);
+        if (ok) CS.flashButton(btn, 'Copied ✓');
+        var body = [];
+        body.push(ok ? 'Anyone with this link can open the design and carry on editing their own copy.'
+                     : 'Your browser blocked the clipboard here; copy the link above.');
+        if (url.length > 8000) body.push('It is a long link, so some chat apps may cut it short.');
         if (pics) {
-          notice('warn', 'This design has ' + (pics === 1 ? 'a picture or image texture' : pics + ' pictures or image textures') +
-                 ', which links cannot carry. To share it complete, send the file from Save (.case.json) or the exported 3MF instead.');
+          body.push({ warn: true, text: 'Not included: ' + (pics === 1 ? 'a picture or image texture' : pics + ' pictures or image textures') +
+                     '. Links cannot carry those — to share the design complete, send the file from Save (.case.json) or the exported 3MF.' });
         }
+        CS.sharePopup({ anchor: btn, title: ok ? 'Link copied' : 'Share this link', link: url, linkCopied: ok, body: body });
       });
     }).catch(function (err) {
-      notice('warn', 'Could not make a link: ' + err.message);
+      CS.sharePopup({ anchor: btn, kind: 'warn', title: 'Could not make a link', body: [err.message] });
     });
   }
 
@@ -1383,14 +1387,16 @@
       history.replaceState(null, '', CS.shareBase());   // later refreshes use the session
       loadPayload(p, function () {
         done();
-        if (p.picturesLeftOut) {
-          notice('warn', 'Opened a shared design. It had ' + (p.picturesLeftOut === 1 ? 'a picture or image texture' : p.picturesLeftOut + ' pictures or image textures') +
-                 ' that links cannot carry; ask the sender for the design file to get ' + (p.picturesLeftOut === 1 ? 'it' : 'them') + '.');
-        } else notice('ok', 'Opened a shared design.');
+        var n = p.picturesLeftOut;
+        CS.sharePopup({ title: 'Opened a shared design', kind: n ? 'warn' : 'ok', body: n
+          ? [{ warn: true, text: 'It had ' + (n === 1 ? 'a picture or image texture' : n + ' pictures or image textures') +
+               ' that links cannot carry. Ask the sender for the design file to get ' + (n === 1 ? 'it' : 'them') + '.' }]
+          : ['Changes you make stay in your own copy.'] });
       });
     }).catch(function (err) {
       history.replaceState(null, '', CS.shareBase());
-      notice('warn', 'That design link is damaged or cut short, so it could not be opened. Ask for it again, or for the design file.');
+      CS.sharePopup({ kind: 'warn', title: 'That link could not be opened',
+        body: ['It looks damaged or cut short. Ask for it again, or for the design file.'] });
       if (!restoreSession(done)) done();
     });
     return true;

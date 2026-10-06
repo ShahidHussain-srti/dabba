@@ -382,3 +382,24 @@ button.danger:disabled{color:var(--bad)}
 .w.notice .msg{flex:1; min-width:0}
 .w.notice .iconbtn{width:22px; height:22px; padding:0; margin-left:6px; flex:none}
 .sharelink{display:block; width:100%; margin-top:6px; font-family:var(--mono); font-size:11px}
+
+/* share popup */
+.sharepop{position:fixed; z-index:50; width:min(380px, calc(100vw - 16px)); background:var(--bg2, #1b1f27);
+  border:1px solid var(--line2); border-radius:10px; padding:10px 12px 12px; box-shadow:0 10px 30px rgba(0,0,0,.45);
+  opacity:0; transform:translateY(-4px); transition:opacity .16s, transform .16s; font-size:12px; color:var(--ink2)}
+.sharepop.in{opacity:1; transform:none}
+.sharepop.centred{top:64px; left:50%; transform:translate(-50%,-4px)}
+.sharepop.centred.in{transform:translate(-50%,0)}
+.sp-head{display:flex; align-items:center; gap:8px}
+.sp-head b{flex:1; color:var(--ink); font-size:13px; font-weight:600}
+.sp-ic{width:18px; height:18px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:700;
+  background:var(--ok); color:#0b0d10; flex:none}
+.sharepop.warn .sp-ic{background:var(--warn)}
+.sp-x{background:none; border:0; color:var(--ink3); padding:2px 4px; cursor:pointer; font-size:12px}
+.sp-x:hover{color:var(--ink)}
+.sp-link{display:flex; gap:6px; margin-top:9px}
+.sp-link input{flex:1; min-width:0; font-family:var(--mono); font-size:11px; padding:5px 7px}
+.sp-link button{flex:none; padding:5px 10px; font-size:11.5px}
+.sp-body{margin:8px 0 0; line-height:1.45}
+.sp-body.warn{color:var(--ink); padding:7px 9px; border-radius:7px; background:rgba(230,180,80,.1); border:1px solid rgba(230,180,80,.35)}
+button.flash{border-color:var(--ok) !important; color:var(--ok) !important}
