@@ -12,7 +12,7 @@ from there.
 
 Nothing to install and no build step. Use the link above, or download the repo and
 double-click `index.html`; it works offline too, because the geometry engine
-([Manifold](https://github.com/elalish/manifold)) is bundled in `vendor/`.
+([Manifold](https://github.com/elalish/manifold)) is bundled in `vendor/workbench/`.
 
 ## What you can make
 
@@ -125,9 +125,8 @@ styling) live in
 ## Development
 
 ```sh
-npm install      # manifold-3d, for the tests and for re-vendoring
+npm install      # manifold-3d, for the tests
 npm test         # geometry, collision, layout and 3MF checks in node
-npm run vendor   # rebuild vendor/manifold.js after changing the manifold-3d version
 npm run render-stl -- case.stl case.png   # look at an export without a slicer
 node ../workbench/tools/sync.mjs .        # refresh vendor/workbench from a checkout beside this one
 ```
@@ -146,9 +145,10 @@ use it, change it and share it. If you distribute something built from it, inclu
 hosting a modified copy on a website, that has to be GPL with its source available too.
 There's no warranty. See [LICENSE](LICENSE) for the full text.
 
-`vendor/manifold.js` is [Manifold](https://github.com/elalish/manifold), © The Manifold
-Authors, under the Apache License 2.0 ([vendor/LICENSE-manifold.txt](vendor/LICENSE-manifold.txt)),
-which is compatible with the GPL.
+`vendor/workbench/manifold.js` is [Manifold](https://github.com/elalish/manifold), © The
+Manifold Authors, under the Apache License 2.0
+([vendor/workbench/LICENSE-manifold.txt](vendor/workbench/LICENSE-manifold.txt)), which is
+compatible with the GPL.
 
 `vendor/workbench/` is [Workbench](https://github.com/ShahidHussain-srti/workbench), by the
 same author under the same license.

@@ -1279,24 +1279,13 @@
   /* ── geometry engine ────────────────────────────────────────────── */
   function loadEngine() {
     busy(true, 'Loading the geometry engine…');
-    var bin;
-    try {
-      var s = atob(window.ManifoldWasmBase64);
-      bin = new Uint8Array(s.length);
-      for (var i = 0; i < s.length; i++) bin[i] = s.charCodeAt(i);
-    } catch (e) {
-      busy(false);
-      showWarnings([{ level: 'bad', msg: 'vendor/manifold.js is missing or damaged, so nothing can be built.' }]);
-      return;
-    }
-    window.ManifoldModule({ wasmBinary: bin }).then(function (w) {
-      w.setup();
+    WB.loadManifold().then(function (w) {
       CS.setManifold(w);
       busy(false);
       rebuild();
-    }).catch(function (err) {
+    }, function (err) {
       busy(false);
-      showWarnings([{ level: 'bad', msg: 'The geometry engine failed to start: ' + err.message }]);
+      showWarnings([{ level: 'bad', msg: err.message }]);
     });
   }
 

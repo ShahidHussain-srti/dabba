@@ -5,7 +5,6 @@
   "description": "Design a hinged, multi-compartment case around objects you have measured, and export a multi-colour 3MF.",
   "scripts": {
     "test": "node test/run.mjs",
-    "vendor": "node tools/vendor-manifold.mjs",
     "render-stl": "node tools/render-stl.mjs"
   },
   "devDependencies": {
