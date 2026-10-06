@@ -923,9 +923,37 @@
     $('#stat-mass').innerHTML = '<b>' + grams.toFixed(1) + '</b> g · ' + Math.round(ms) + ' ms';
   }
 
+  /* Notices stay above the build warnings until dismissed, since those are
+     redrawn on every rebuild. */
+  var notices = [], lastWarnings = [];
+  function notice(level, msg, link) {
+    notices = notices.filter(function (n) { return n.msg !== msg; });
+    notices.push({ level: level, msg: msg, link: link });
+    showWarnings(lastWarnings);
+  }
+
   function showWarnings(list) {
+    lastWarnings = list || [];
     var box = $('#warnings');
     box.innerHTML = '';
+    notices.forEach(function (n) {
+      var d = document.createElement('div');
+      d.className = 'w ' + n.level + ' notice';
+      d.innerHTML = '<span class="ic">' + (n.level === 'warn' ? '▲' : 'ⓘ') + '</span><span class="msg"></span>' +
+        '<button type="button" class="ghost iconbtn" aria-label="Dismiss">✕</button>';
+      d.querySelector('.msg').textContent = n.msg;
+      if (n.link) {
+        var inp = document.createElement('input');
+        inp.readOnly = true; inp.value = n.link; inp.className = 'sharelink';
+        inp.addEventListener('focus', function () { inp.select(); });
+        d.querySelector('.msg').appendChild(inp);
+      }
+      d.lastChild.addEventListener('click', function () {
+        notices.splice(notices.indexOf(n), 1);
+        showWarnings(lastWarnings);
+      });
+      box.appendChild(d);
+    });
     var order = { bad: 0, warn: 1, ok: 2 };
     (list || []).slice().sort(function (a, b) { return order[a.level] - order[b.level]; }).forEach(function (w) {
       var d = document.createElement('div');
@@ -1176,6 +1204,7 @@
                   safeName() + '.case.json');
     });
 
+    $('#btn-share').addEventListener('click', shareLink);
     $('#btn-load').addEventListener('click', function () { $('#loadfile').click(); });
     $('#loadfile').addEventListener('change', function (e) {
       var f = e.target.files && e.target.files[0];
@@ -1320,6 +1349,53 @@
     });
   }
 
+  /* ── share links ──────────────────────────────────────────────────
+     The settings travel in the link; pictures and image textures do not, as
+     they would make it far too long. */
+  function pictureCount() {
+    return Object.keys(CS.assets.images).length + Object.keys(CS.assets.drawings).length +
+           (CS.assets.texture ? 1 : 0);
+  }
+  function shareLink() {
+    var pics = pictureCount();
+    var payload = { app: 'dabba', version: 1, state: JSON.parse(CS.serialize(state)), assets: {} };
+    if (pics) payload.picturesLeftOut = pics;
+    CS.shareEncode(payload).then(function (hash) {
+      var url = CS.shareBase() + hash;
+      return CS.copyText(url).then(function (ok) {
+        notice('ok', (ok ? 'Link copied — it opens this design. ' : 'Copy this link to share the design: ') +
+               (url.length > 8000 ? '(It is long; some chat apps may cut it short.) ' : ''), ok ? null : url);
+        if (pics) {
+          notice('warn', 'This design has ' + (pics === 1 ? 'a picture or image texture' : pics + ' pictures or image textures') +
+                 ', which links cannot carry. To share it complete, send the file from Save (.case.json) or the exported 3MF instead.');
+        }
+      });
+    }).catch(function (err) {
+      notice('warn', 'Could not make a link: ' + err.message);
+    });
+  }
+
+  /* Opens a design from the link, if it carries one. Returns whether it does;
+     done() runs once the design is in place. */
+  function openSharedLink(done) {
+    if (location.hash.indexOf('#d=') !== 0) return false;
+    CS.shareDecode(location.hash).then(function (p) {
+      history.replaceState(null, '', CS.shareBase());   // later refreshes use the session
+      loadPayload(p, function () {
+        done();
+        if (p.picturesLeftOut) {
+          notice('warn', 'Opened a shared design. It had ' + (p.picturesLeftOut === 1 ? 'a picture or image texture' : p.picturesLeftOut + ' pictures or image textures') +
+                 ' that links cannot carry; ask the sender for the design file to get ' + (p.picturesLeftOut === 1 ? 'it' : 'them') + '.');
+        } else notice('ok', 'Opened a shared design.');
+      });
+    }).catch(function (err) {
+      history.replaceState(null, '', CS.shareBase());
+      notice('warn', 'That design link is damaged or cut short, so it could not be opened. Ask for it again, or for the design file.');
+      if (!restoreSession(done)) done();
+    });
+    return true;
+  }
+
   /* ── session persistence ────────────────────────────────────────────
      The design survives a refresh via localStorage. Artwork is stored too, but
      dropped rather than losing the design if the quota is hit. */
@@ -1451,10 +1527,11 @@
     assets();
     exports_();
 
-    var restoring = restoreSession(function (note) {
-      afterLoad();
-      if (note) showWarnings([{ level: 'warn', msg: note }]);
-    });
+    var restoring = openSharedLink(afterLoad) ||
+      restoreSession(function (note) {
+        afterLoad();
+        if (note) notice('warn', note);
+      });
     refresh();
 
     var ro = new ResizeObserver(function () { drawViews(); });

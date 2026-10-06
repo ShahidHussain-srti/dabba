@@ -96,7 +96,10 @@ the geometry engine ([Manifold](https://github.com/elalish/manifold)) is bundled
   inlay / engraved / raised per face.
 
 `⌘Z` / `Ctrl+Z` undoes anything. Your work survives a refresh; **Reset** starts over.
-**Save** / **Load** keep a design as JSON.
+**Save** / **Load** keep a design as JSON. **Share** copies a link that opens the design:
+the settings are packed into the link itself (after the `#`, so never sent to a server).
+Pictures and image textures are too big for a link and are left out — to share those,
+send the saved `.case.json` or the exported 3MF.
 
 ## Printing
 
