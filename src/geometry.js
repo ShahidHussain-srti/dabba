@@ -1228,7 +1228,12 @@ window.CS = window.CS || {};
         var lipHere = D.lipOn && D.lipSides[D.claspSide] && g.zA - g.rb < D.zP + D.lipH + D.lipC;
         var wallHere = lipHere ? D.T0 / 2 - D.lipC / 2 : D.T0;
         var ovL = Math.max(0.4, wallHere - 0.6) + (g.zA - D.zP) * D.tanO;
-        addL.push(cylY(S, xp, g.zA, g.yH1, yF + ovL, g.rb, seg));
+        // The lid prints upside down, so the boss's upper side faces the bed.
+        // A 45° chin runs from it up to the wall (behind the hook's plane, so
+        // it can't foul the hook), the way the hinge knuckles have one.
+        var stick = yF - g.yH1, chinTop = Math.min(g.zA + g.rb + stick, D.zT - D.et - 0.4);
+        addL.push(hullOf(S, [cylY(S, xp, g.zA, g.yH1, yF + ovL, g.rb, seg),
+                             box(S, xp - g.rb, yF, g.zA, xp + g.rb, yF + ovL, chinTop)]));
         cutL.push(cylY(S, xp, g.zA, g.yH0 - 1, yF + Math.max(0.4, wallHere - 0.8), g.pinR, Math.max(16, Math.round(seg / 2))));
 
         // Eye on the base: a block with a 45° chin, slotted by the band's own
@@ -1236,6 +1241,11 @@ window.CS = window.CS || {};
         var ovB = Math.max(0.4, D.T0 / 2) + (D.zP - g.eyeLow) * D.tanO;
         var yOut = g.yH0 - g.cl - g.bridgeT, top = D.zP - 0.3;
         var chinLow = Math.max(g.eyeLow - g.out, D.eb + 0.4);
+        if (g.eyeLow - g.out < D.eb + 0.4 - 0.05 && !D.swingChinWarned) {
+          D.swingChinWarned = true;
+          warn.push({ level: 'warn', msg: 'The swing hook\'s eye sits too low for a full 45° chin under it, so its underside may need ' +
+            'support. A taller base share, a smaller hub or less extra hook length fixes it.' });
+        }
         var block = hullOf(S, [box(S, xp - g.h, yOut, g.eyeLow, xp + g.h, yF + ovB, top),
                                box(S, xp - g.h, yF, chinLow, xp + g.h, yF + ovB, top)]);
         var slot = W2.annulusY(xp, g.zA, g.Rt - g.wb / 2 - g.cl, g.Rt + g.wb / 2 + g.cl, g.yH0 - g.cl, g.yH1 + g.cl);
