@@ -3,6 +3,8 @@
 Design a hinged, two-piece case around objects you have already measured, and export a
 3D-printable multi-colour `.3mf`.
 
+**Use it online: https://shahidhussain-srti.github.io/dabba/**
+
 No build step and nothing to install — **double-click `index.html`**. It works offline:
 the geometry engine ([Manifold](https://github.com/elalish/manifold)) is bundled in
 `vendor/` with its WebAssembly inlined.
