@@ -66,7 +66,7 @@ window.CS = window.CS || {};
       params: [{ key: 'type', label: 'Card', options: Object.keys(CARDS).map(function (k) { return [k, CARDS[k].label]; }) },
                ['count', 'Slots', 6, 1, 40, 1], ['hold', 'Hold depth', 60, 20, 100, 5, '%'], ['gap', 'Wall between', 1.6, 0.6, 10, 0.1]] },
     { key: 'custom', name: 'Custom shapes', group: 'Custom',
-      hint: 'Build the pocket from basic shapes: drag them in the plan, resize from the corner, turn with the round handle.',
+      hint: 'Build the pocket from basic shapes: drag them in the plan, resize from any edge or corner, turn with the round grip.',
       custom: true }
   ];
   CS.itemByKey = function (k) {

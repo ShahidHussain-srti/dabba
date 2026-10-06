@@ -259,50 +259,139 @@ window.CS = window.CS || {};
     return r && r.node.item === 'custom' && r.node._shape ? r : null;
   };
 
-  /* Handles of shape i of a custom compartment, in CSS px: a square at its
-     corner (resize) and a disc beyond its top edge (turn). */
+  /* Handles of one shape of a custom compartment, in CSS px. Eight resize
+     handles sit on its box (corners and edge middles; corners only for a
+     hexagon, which keeps its proportions), and a turn grip stands on a stem
+     off its top edge. ax/ay say which sides a handle moves (-1, 0 or 1, in the
+     shape's own frame). */
+  var HANDLE_PX = 9, GRIP_GAP = 26;
   Plan.prototype.primHandles = function (t, r, q) {
     var a = (q.rot || 0) * Math.PI / 180, c = Math.cos(a), s2 = Math.sin(a);
-    var corner = [q.w / 2, q.type === 'hex' ? q.w / 2 : q.l / 2];
+    var hw = q.w / 2, hl = (q.type === 'hex' ? q.w : q.l) / 2;
     var cxw = r.cx + q.x, cyw = r.cy + q.y;
-    var kx = cxw + corner[0] * c - corner[1] * s2, ky = cyw + corner[0] * s2 + corner[1] * c;
-    var up = (q.type === 'hex' ? q.w : q.l) / 2;
-    var ux = cxw - up * s2, uy = cyw + up * c;
-    var ox = -s2, oy = c, gap = 16 / t.s;
-    return { resize: { x: sx(t, kx), y: sy(t, ky) }, rotate: { x: sx(t, ux + ox * gap), y: sy(t, uy + oy * gap) },
-             stem: { x: sx(t, ux), y: sy(t, uy) }, centre: { x: sx(t, cxw), y: sy(t, cyw) } };
+    var at = function (lx, ly) { return { x: sx(t, cxw + lx * c - ly * s2), y: sy(t, cyw + lx * s2 + ly * c) }; };
+    var list = [];
+    [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, -1], [1, 0], [0, 1], [-1, 0]].forEach(function (k) {
+      if (q.type === 'hex' && (!k[0] || !k[1])) return;
+      var pt = at(k[0] * hw, k[1] * hl);
+      list.push({ handle: 'resize', ax: k[0], ay: k[1], x: pt.x, y: pt.y });
+    });
+    var stem = at(0, hl), grip = at(0, hl + GRIP_GAP / t.s);
+    return { resize: list, rotate: grip, stem: stem, centre: at(0, 0),
+             box: [at(-hw, -hl), at(hw, -hl), at(hw, hl), at(-hw, hl)] };
   };
+
+  /* Screen direction of a resize handle, as the nearest of the four resize
+     cursors, so the cursor still points the right way on a turned shape. */
+  function resizeCursor(q, ax, ay) {
+    var a = (q.rot || 0) * Math.PI / 180;
+    var dx = ax * Math.cos(a) - ay * Math.sin(a), dy = ax * Math.sin(a) + ay * Math.cos(a);
+    var deg = ((Math.atan2(dy, dx) * 180 / Math.PI) % 180 + 180) % 180;
+    return ['ew-resize', 'nesw-resize', 'ns-resize', 'nwse-resize'][Math.round(deg / 45) % 4];
+  }
+
+  function pill(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
+  }
 
   Plan.prototype._primSelection = function (ctx, t) {
     var r = this.customRect();
     if (!r) return;
-    var s = r.node, self = this, sel = s._sel || 0;
+    var s = r.node, self = this, sel = s._sel || 0, hv = this.hover, d = this.drag;
+    var ACC = '#ffd166';
     r.node._shape.prims.forEach(function (q, i) {
-      var hot = self.hover && self.hover.prim === i;
+      var hot = hv && hv.prim === i && hv.id === r.id;
       if (i !== sel && !hot) return;
       ctx.save();
       self._primPath(ctx, t, r, q);
-      ctx.strokeStyle = i === sel ? '#ffd166' : 'rgba(255,209,102,0.6)';
-      ctx.lineWidth = i === sel ? 2 : 1.25;
-      ctx.setLineDash(i === sel ? [] : [4, 3]);
-      ctx.stroke();
+      if (i !== sel) {                       // a shape you could pick up
+        ctx.fillStyle = 'rgba(255,209,102,0.10)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,209,102,0.7)'; ctx.lineWidth = 1.25; ctx.setLineDash([4, 3]); ctx.stroke();
+        ctx.restore();
+        return;
+      }
+      ctx.strokeStyle = ACC; ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
-      if (i !== sel) return;
+
       var h = self.primHandles(t, r, q);
+      // Its box, when that isn't the outline itself.
+      if (q.type !== 'rect') {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,209,102,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        h.box.forEach(function (pt, k) { if (k) ctx.lineTo(pt.x, pt.y); else ctx.moveTo(pt.x, pt.y); });
+        ctx.closePath(); ctx.stroke();
+        ctx.restore();
+      }
+      // Move grip in the middle: a cross with four arrowheads.
+      var c = h.centre, hotMove = (hv && hv.prim === i && !hv.handle) || (d && d.kind === 'prim' && d.handle === 'move');
       ctx.save();
-      ctx.strokeStyle = '#ffd166'; ctx.fillStyle = '#ffd166'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(h.stem.x, h.stem.y); ctx.lineTo(h.rotate.x, h.rotate.y); ctx.stroke();
-      ctx.beginPath(); ctx.arc(h.rotate.x, h.rotate.y, 5.5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillRect(h.resize.x - 5, h.resize.y - 5, 10, 10);
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1;
-      ctx.strokeRect(h.resize.x - 5, h.resize.y - 5, 10, 10);
+      ctx.fillStyle = hotMove ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.45)';
+      ctx.beginPath(); ctx.arc(c.x, c.y, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = hotMove ? '#fff' : ACC; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(c.x - 7, c.y); ctx.lineTo(c.x + 7, c.y); ctx.moveTo(c.x, c.y - 7); ctx.lineTo(c.x, c.y + 7); ctx.stroke();
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (k) {
+        var tx = c.x + k[0] * 8.5, ty = c.y + k[1] * 8.5;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(tx - k[0] * 3.5 - k[1] * 3, ty - k[1] * 3.5 - k[0] * 3);
+        ctx.lineTo(tx - k[0] * 3.5 + k[1] * 3, ty - k[1] * 3.5 + k[0] * 3);
+        ctx.closePath(); ctx.fill();
+      });
       ctx.restore();
+      // Turn grip on its stem, with a curved arrow.
+      var hotRot = (hv && hv.handle === 'rotate') || (d && d.kind === 'prim' && d.handle === 'rotate');
+      var g = h.rotate;
+      ctx.save();
+      ctx.strokeStyle = ACC; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(h.stem.x, h.stem.y); ctx.lineTo(g.x, g.y); ctx.stroke();
+      ctx.fillStyle = hotRot ? '#fff' : ACC;
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(g.x, g.y, hotRot ? 10 : 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(g.x, g.y, 4.5, -Math.PI * 0.9, Math.PI * 0.4); ctx.stroke();
+      var ea = Math.PI * 0.4, ex = g.x + 4.5 * Math.cos(ea), ey = g.y + 4.5 * Math.sin(ea);
+      ctx.fillStyle = 'rgba(0,0,0,0.8)';
+      ctx.beginPath(); ctx.moveTo(ex + 3, ey - 0.8); ctx.lineTo(ex - 2.2, ey + 2.2); ctx.lineTo(ex - 0.6, ey - 2.8); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      // Resize handles: corners a little bigger than edge middles.
+      h.resize.forEach(function (k) {
+        var on = (hv && hv.handle === 'resize' && hv.ax === k.ax && hv.ay === k.ay) ||
+                 (d && d.kind === 'prim' && d.handle === 'resize' && d.ax === k.ax && d.ay === k.ay);
+        var sz = on ? 14 : (k.ax && k.ay ? 11 : 9);
+        ctx.save();
+        ctx.fillStyle = on ? '#fff' : ACC;
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1;
+        pill(ctx, k.x - sz / 2, k.y - sz / 2, sz, sz, 2.5);
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
+      });
+      // Live readout while resizing or turning.
+      if (d && d.kind === 'prim' && d.prim === i && d.handle !== 'move') {
+        var src = q.src || q;
+        var txt = d.handle === 'rotate' ? Math.round(src.rot || 0) + '°'
+                : q.type === 'hex' ? fmt(src.w) + ' mm across'
+                : q.type === 'cyl' ? fmt(src.w) + ' long · ⌀ ' + fmt(src.l)
+                : fmt(src.w) + ' × ' + fmt(src.l) + ' mm';
+        ctx.save();
+        ctx.font = '600 11px ui-monospace, Menlo, monospace';
+        var tw = ctx.measureText(txt).width + 16;
+        var by = Math.max.apply(null, h.box.map(function (pt) { return pt.y; }).concat([g.y])) + 16;
+        ctx.fillStyle = 'rgba(0,0,0,0.78)';
+        pill(ctx, c.x - tw / 2, by, tw, 20, 10); ctx.fill();
+        ctx.fillStyle = ACC; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(txt, c.x, by + 10);
+        ctx.restore();
+      }
     });
   };
 
   Plan.prototype._label = function (ctx, t, r) {
     var s = r.node, w = r.w * t.s, h = r.l * t.s;
     if (w < 36 || h < 22) return;
+    // A custom compartment being edited has its shape handles there instead.
+    if (s.item === 'custom' && r.id === this.state.selected) return;
     var name = s.name || CS.layout.label(s, this.D.sections);
     var l1 = CS.itemByKey(s.item).size ? fmt(s.w) + ' × ' + fmt(s.l) : CS.itemSummary(s);
     var hh = s._shape ? s._shape.h : s.h;
@@ -408,30 +497,47 @@ window.CS = window.CS || {};
   };
 
   /* Move, resize or turn one shape of a custom compartment. The layout
-     reflows as the footprint changes, so the view is panned to keep the
-     shape under the pointer, the way edge resizing holds the far edge. */
+     reflows as the footprint changes, so the view is panned to hold the shape
+     where it should be on screen, the way edge resizing holds the far edge.
+     Resizing keeps the opposite side still (Alt: resize about the centre);
+     Shift gives fine steps, and free angles when turning. */
   Plan.prototype._dragPrim = function (e, p) {
     var d = this.drag, t = this.frozen, found = CS.layout.find(this.state.layout, d.id);
     if (!found) return;
     var node = found.node, src = node.prims[d.prim];
     if (!src) return;
-    var fit = this.D.fit, step = e.shiftKey ? 0.1 : 0.5;
+    var step = e.shiftKey ? 0.1 : 0.5;
     var snap = function (v) { return Math.round(v / step) * step; };
+    var mx = (p.x - d.x) / t.s, my = -(p.y - d.y) / t.s;      // pointer travel, mm
     if (d.handle === 'move') {
-      src.x = snap(d.sx0 + (p.x - d.x) / t.s);
-      src.y = snap(d.sy0 - (p.y - d.y) / t.s);
-      d.cx = p.x - d.grabX; d.cy = p.y - d.grabY;
-    } else {
-      // Pointer in the shape's own frame, around its (fixed) centre.
-      var a = (src.rot || 0) * Math.PI / 180, dx = (p.x - d.cx) / t.s, dy = -(p.y - d.cy) / t.s;
-      if (d.handle === 'resize') {
-        var lx = dx * Math.cos(a) + dy * Math.sin(a), ly = -dx * Math.sin(a) + dy * Math.cos(a);
-        src.w = Math.max(2, snap(2 * Math.abs(lx) - 2 * fit));
-        if (src.type === 'hex') src.l = src.w; else src.l = Math.max(2, snap(2 * Math.abs(ly) - 2 * fit));
+      src.x = snap(d.sx0 + mx);
+      src.y = snap(d.sy0 + my);
+      d.cx = d.cx0 + (src.x - d.sx0) * t.s; d.cy = d.cy0 - (src.y - d.sy0) * t.s;
+    } else if (d.handle === 'resize') {
+      var a = (d.rot0 || 0) * Math.PI / 180, c = Math.cos(a), s2 = Math.sin(a);
+      var lx = mx * c + my * s2, ly = -mx * s2 + my * c;      // travel in the shape's frame
+      var k = e.altKey ? 2 : 1;                              // about the centre, both sides move
+      var w = d.w0, l = d.l0;
+      if (src.type === 'hex') {                              // keeps its shape: follow the larger pull
+        var gw = d.w0 + k * d.ax * lx, gl = d.w0 + k * d.ay * ly;
+        w = l = Math.max(2, snap(Math.abs(gw - d.w0) > Math.abs(gl - d.w0) ? gw : gl));
       } else {
-        var deg = Math.atan2(dy, dx) * 180 / Math.PI - 90;
-        src.rot = ((e.shiftKey ? Math.round(deg) : Math.round(deg / 15) * 15) + 360) % 360;
+        if (d.ax) w = Math.max(2, snap(d.w0 + k * d.ax * lx));
+        if (d.ay) l = Math.max(2, snap(d.l0 + k * d.ay * ly));
       }
+      src.w = w;
+      src.l = l;
+      // The centre follows half the growth, so the opposite side stays put.
+      var cxl = e.altKey ? 0 : d.ax * (w - d.w0) / 2;
+      var cyl = e.altKey ? 0 : d.ay * (l - d.l0) / 2;
+      var ox = cxl * c - cyl * s2, oy = cxl * s2 + cyl * c;
+      src.x = Math.round((d.sx0 + ox) * 1000) / 1000;
+      src.y = Math.round((d.sy0 + oy) * 1000) / 1000;
+      d.cx = d.cx0 + ox * t.s; d.cy = d.cy0 - oy * t.s;
+    } else {
+      var dx = (p.x - d.cx) / t.s, dy = -(p.y - d.cy) / t.s;
+      var deg = Math.atan2(dy, dx) * 180 / Math.PI - 90;
+      src.rot = ((e.shiftKey ? Math.round(deg) : Math.round(deg / 15) * 15) + 360) % 360;
     }
     // Reflow, then pan so the shape's centre lands where it should on screen.
     this.describe();
@@ -441,7 +547,7 @@ window.CS = window.CS || {};
       this.frozen.ox += d.cx - sx(this.frozen, r.cx + q.x);
       this.frozen.oy += d.cy - sy(this.frozen, r.cy + q.y);
     }
-    this.canvas.style.cursor = d.handle === 'move' ? 'grabbing' : d.handle === 'resize' ? 'nwse-resize' : 'alias';
+    this.canvas.style.cursor = d.handle === 'resize' ? resizeCursor(src, d.ax, d.ay) : 'grabbing';
     this.draw();
     this.hooks.change(true);
   };
@@ -475,14 +581,20 @@ window.CS = window.CS || {};
     var r = D.rects.filter(function (q) { return q.id === sel; })[0];
     if (!r) return [];
     var x0 = sx(t, r.x0), x1 = sx(t, r.x1), yT = sy(t, r.y1), yB = sy(t, r.y0);
-    var mx = (x0 + x1) / 2, my = (yT + yB) / 2, off = PLUS_R + 9;
+    // A custom compartment has shape handles on and just outside its edges
+    // (the turn grip stands GRIP_GAP px out), so its buttons step clear of them.
+    var custom = r.node.item === 'custom';
+    var mx = (x0 + x1) / 2, my = (yT + yB) / 2, off = PLUS_R + (custom ? GRIP_GAP + 22 : 9);
     var out = [
       { key: 'add:left',  kind: 'add', side: 'left',  x: x0 - off, y: my, r: PLUS_R },
       { key: 'add:right', kind: 'add', side: 'right', x: x1 + off, y: my, r: PLUS_R },
       { key: 'add:back',  kind: 'add', side: 'back',  x: mx, y: yT - off, r: PLUS_R },
       { key: 'add:front', kind: 'add', side: 'front', x: mx, y: yB + off, r: PLUS_R }
     ];
-    if (D.rects.length > 1) out.push({ key: 'delete', kind: 'delete', x: x1 - 11, y: yT + 11, r: 8 });
+    if (D.rects.length > 1) {
+      out.push(custom ? { key: 'delete', kind: 'delete', x: x1 + 14, y: yT - 14, r: 8 }
+                      : { key: 'delete', kind: 'delete', x: x1 - 11, y: yT + 11, r: 8 });
+    }
     return out;
   };
 
@@ -568,19 +680,27 @@ window.CS = window.CS || {};
   Plan.prototype.hit = function (x, y) {
     if (!this.D) return null;
     var t = this.transform(), D = this.D;
-    var btns = this.buttons(t);
-    for (var i = 0; i < btns.length; i++) {
-      if (Math.hypot(x - btns[i].x, y - btns[i].y) <= btns[i].r + 2) return { button: btns[i].key, b: btns[i] };
-    }
     // Shapes of the selected custom compartment, handles first.
     var cr = this.customRect();
     if (cr) {
       var prims = cr.node._shape.prims, selp = cr.node._sel || 0;
       if (prims[selp]) {
         var hh = this.primHandles(t, cr, prims[selp]);
-        if (Math.hypot(x - hh.rotate.x, y - hh.rotate.y) <= 8) return { id: cr.id, prim: selp, handle: 'rotate' };
-        if (Math.abs(x - hh.resize.x) <= 7 && Math.abs(y - hh.resize.y) <= 7) return { id: cr.id, prim: selp, handle: 'resize' };
+        if (Math.hypot(x - hh.rotate.x, y - hh.rotate.y) <= 12) return { id: cr.id, prim: selp, handle: 'rotate' };
+        var best = null, bd = HANDLE_PX + 1;
+        hh.resize.forEach(function (k) {
+          var dd = Math.max(Math.abs(x - k.x), Math.abs(y - k.y));
+          if (dd < bd) { bd = dd; best = k; }
+        });
+        if (best) return { id: cr.id, prim: selp, handle: 'resize', ax: best.ax, ay: best.ay };
+        if (Math.hypot(x - hh.centre.x, y - hh.centre.y) <= 12) return { id: cr.id, prim: selp };
       }
+    }
+    var btns = this.buttons(t);
+    for (var i = 0; i < btns.length; i++) {
+      if (Math.hypot(x - btns[i].x, y - btns[i].y) <= btns[i].r + 2) return { button: btns[i].key, b: btns[i] };
+    }
+    if (cr) {
       var mmx = (x - t.ox) / t.s - cr.cx, mmy = (t.oy - y) / t.s - cr.cy;
       for (var pi = prims.length - 1; pi >= 0; pi--) {
         if (inPoly(mmx, mmy, CS.primOutline(prims[pi], 24))) return { id: cr.id, prim: pi };
@@ -633,8 +753,11 @@ window.CS = window.CS || {};
     function cursorFor(h) {
       if (!h) return 'default';
       if (h.button) return 'pointer';
-      if (h.handle === 'resize') return 'nwse-resize';
-      if (h.handle === 'rotate') return 'alias';
+      if (h.handle === 'resize') {
+        var crc = self.customRect(), qc = crc && crc.node._shape.prims[h.prim];
+        return qc ? resizeCursor(qc, h.ax, h.ay) : 'nwse-resize';
+      }
+      if (h.handle === 'rotate') return 'grab';
       if (h.prim != null) return 'move';
       if (h.edge) return (h.edge === 'left' || h.edge === 'right') ? 'ew-resize' : 'ns-resize';
       if (h.id || h.panel) return 'pointer';
@@ -665,9 +788,10 @@ window.CS = window.CS || {};
         self.frozen = { s: t0.s, ox: t0.ox, oy: t0.oy };
         var cx0 = sx(t0, cr.cx + q.x), cy0 = sy(t0, cr.cy + q.y);
         self.drag = { kind: 'prim', id: cr.id, prim: h.prim, handle: h.handle || 'move', x: p.x, y: p.y,
-                      sx0: src.x, sy0: src.y, rot0: src.rot || 0,
+                      ax: h.ax || 0, ay: h.ay || 0,
+                      sx0: src.x, sy0: src.y, rot0: src.rot || 0, w0: src.w, l0: src.type === 'hex' ? src.w : src.l,
                       // where the shape's centre sits on screen, held there as the layout reflows
-                      cx: cx0, cy: cy0, grabX: p.x - cx0, grabY: p.y - cy0 };
+                      cx: cx0, cy: cy0, cx0: cx0, cy0: cy0 };
         canvas.setPointerCapture(e.pointerId);
         self.draw();
         e.preventDefault();
@@ -725,9 +849,11 @@ window.CS = window.CS || {};
       }
       var h = self.hit(p.x, p.y);
       canvas.style.cursor = cursorFor(h);
-      var key = h ? (h.button || '') + (h.id || '') + (h.edge || '') + (h.prim != null ? 'p' + h.prim : '') : '';
-      var prev = self.hover ? (self.hover.button || '') + (self.hover.id || '') + (self.hover.edge || '') +
-                 (self.hover.prim != null ? 'p' + self.hover.prim : '') : '';
+      var hkey = function (o) {
+        return o ? (o.button || '') + (o.id || '') + (o.edge || '') + (o.prim != null ? 'p' + o.prim : '') +
+                   (o.handle || '') + (o.ax || '') + (o.ay || '') : '';
+      };
+      var key = hkey(h), prev = hkey(self.hover);
       if (key !== prev) { self.hover = h; self.draw(); }
     });
 
@@ -756,6 +882,21 @@ window.CS = window.CS || {};
         e.preventDefault();
         var srcq = crk.node._shape.prims[crk.node._sel || 0];
         if (srcq && srcq.src) { self.hooks.beginEdit(); srcq.src.rot = ((srcq.src.rot || 0) + (e.key === ']' ? 15 : -15) + 360) % 360; self.hooks.change(false); }
+        return;
+      }
+      if (crk && /^Arrow/.test(e.key) && !e.altKey) {
+        // Nudge the selected shape (Shift: 5 mm). Alt+arrows still walk between compartments.
+        e.preventDefault();
+        var nq = crk.node.prims[crk.node._sel || 0];
+        if (nq) {
+          var st = e.shiftKey ? 5 : 0.5;
+          self.hooks.beginEdit();
+          if (e.key === 'ArrowLeft') nq.x -= st;
+          if (e.key === 'ArrowRight') nq.x += st;
+          if (e.key === 'ArrowUp') nq.y += st;
+          if (e.key === 'ArrowDown') nq.y -= st;
+          self.hooks.change(false);
+        }
         return;
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && crk && (crk.node.prims || []).length > 1) {

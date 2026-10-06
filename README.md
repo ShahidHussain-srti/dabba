@@ -33,9 +33,10 @@ whatever you choose.
   standing or lying down.
 - **Hex bit holders** and **card slots** for SD, microSD, USB sticks and CF cards.
 - **Custom shapes**, if none of those fit. Build the pocket out of boxes, ovals, capsules,
-  hexagons and cylinders. Drag them around in the plan, pull the yellow corner to resize,
-  grab the round handle to turn them (or press `[` and `]`), and give each one its own
-  depth if you like.
+  hexagons and cylinders. Drag them around in the plan (or nudge with the arrow keys),
+  pull any edge or corner handle to resize while the opposite side stays put (Alt resizes
+  from the centre), grab the round grip to turn them (or press `[` and `]`), and give each
+  one its own depth if you like.
 
 Each compartment also gets its own pocket depth (by default shorter things sit flush with
 the rim) and optional finger notches so you can get the object back out. Inner walls never

@@ -668,7 +668,7 @@
       box.appendChild(adds);
       var hint2 = document.createElement('p');
       hint2.className = 'hint';
-      hint2.textContent = 'In the plan: drag a shape to move it, drag its square to resize, its round handle to turn ([ and ] turn by 15°). Depth left on auto follows the compartment; a lying cylinder\'s depth is to the bottom of its trough.';
+      hint2.textContent = 'In the plan: drag a shape (or its centre cross) to move it, and arrow keys nudge it. Drag a square on its edge or corner to resize; the opposite side stays put, or hold Alt to resize from the centre. Drag the round grip to turn it ([ and ] turn by 15°). Shift gives fine steps. Depth left on auto follows the compartment; a lying cylinder\'s depth is to the bottom of its trough.';
       box.appendChild(hint2);
     }
     $$('#item-params [data-bind]').forEach(bindEl);
