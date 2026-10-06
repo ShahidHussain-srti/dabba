@@ -34,15 +34,13 @@
       nf.className = 'nf';
       nf.dataset.unit = row.dataset.unit || '';
       var num = document.createElement('input');
+      if (row.dataset.id) { id = row.dataset.id; lab.htmlFor = id; }
       num.type = 'number'; num.id = id; num.dataset.bind = path; num.step = row.dataset.step;
-      if (+row.dataset.min >= 0) num.min = 0;
+      num.min = row.dataset.min; num.max = row.dataset.max;
+      if (row.dataset.scale) num.dataset.scale = row.dataset.scale;   // shown ×scale, e.g. 0.6 as 60 %
+      if (row.dataset.range) num.dataset.range = row.dataset.range;
       nf.appendChild(num);
-      var rng = document.createElement('input');
-      rng.type = 'range'; rng.dataset.bind = path;
-      rng.min = row.dataset.min; rng.max = row.dataset.max; rng.step = row.dataset.step;
-      rng.setAttribute('aria-label', lab.textContent);
-      if (row.dataset.range) { rng.dataset.range = row.dataset.range; num.dataset.range = row.dataset.range; }
-      row.appendChild(lab); row.appendChild(nf); row.appendChild(rng);
+      row.appendChild(lab); row.appendChild(nf);
     });
   }
 
@@ -79,6 +77,7 @@
     if (!isFinite(v0)) v0 = 0;
     var step = parseFloat(input.step) || 1;
     var min = input.min !== '' ? parseFloat(input.min) : -Infinity;
+    var max = input.max !== '' ? parseFloat(input.max) : Infinity;
     var moved = false;
     handle.setPointerCapture(e.pointerId);
     document.body.classList.add('scrubbing');
@@ -90,7 +89,7 @@
       var mult = ev.shiftKey ? 10 : ev.altKey ? 0.1 : 1;
       var grain = step * (ev.altKey ? 0.1 : 1);
       var perPx = (step >= 1 ? step / 6 : step) * mult;
-      var v = Math.max(min, Math.round((v0 + dx * perPx) / grain) * grain);
+      var v = Math.min(max, Math.max(min, Math.round((v0 + dx * perPx) / grain) * grain));
       var dp = Math.max(0, (String(grain).split('.')[1] || '').length);
       input.value = v.toFixed(Math.min(dp, 4));
       input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -332,6 +331,13 @@
         if (el.dataset.nullable != null) v = el.value === '' ? null : parseFloat(el.value);
         else v = coerce(path, v);
         if (typeof v === 'number' && !isFinite(v)) return;   // half-typed number
+        if (el.type === 'number' && v != null) {
+          // Below the minimum may be a value still being typed ("1" on the
+          // way to "12"), so wait; over the maximum is capped straight away.
+          if (el.min !== '' && v < parseFloat(el.min)) return;
+          if (el.max !== '' && v > parseFloat(el.max)) v = parseFloat(el.max);
+          v /= +(el.dataset.scale || 1);
+        }
         // Sliders and typing coalesce into one undo step; discrete pickers don't.
         var continuous = el.type === 'range' || el.type === 'number' || el.tagName === 'TEXTAREA' ||
                          el.type === 'text' || el.type === 'color';
@@ -340,8 +346,14 @@
         onEdit(path, el);
       });
       if (el.type === 'number') {
-        // Settle the field to the stored value once typing is done.
-        el.addEventListener('change', function () { refreshValues(); });
+        // Settle the field once typing is done, pulling a too-small value up.
+        el.addEventListener('change', function () {
+          var v = parseFloat(el.value), k = +(el.dataset.scale || 1);
+          if (isFinite(v) && el.min !== '' && v < parseFloat(el.min) && getV(path) !== undefined) {
+            beginEdit(0); setV(path, parseFloat(el.min) / k); onEdit(path, el);
+          }
+          refreshValues();
+        });
       }
   }
 
@@ -359,7 +371,7 @@
       if (el.classList.contains('seg')) { syncSeg(el, path); return; }
       if (v === undefined || (v === null && el.dataset.nullable == null)) return;
       if (el.type === 'checkbox') el.checked = !!v;
-      else if (el.type === 'number') el.value = v == null ? '' : Math.round(v * 1000) / 1000;
+      else if (el.type === 'number') el.value = v == null ? '' : Math.round(v * (+el.dataset.scale || 1) * 1000) / 1000;
       else el.value = v;
     });
   }
@@ -373,16 +385,14 @@
 
   function labels() {
     var pct = Math.round(state.split * 100);
-    $('#split-readout').textContent = pct + '% base · ' + (100 - pct) + '% lid';
-    var th = getV('~a.threshold');
-    $('#lbl-threshold').textContent = th == null ? '' : Math.round(th * 100) + '%';
+    $('#split-readout').textContent = 'The lid takes the other ' + (100 - pct) + ' %.';
   }
 
   /* Slider limits that depend on the design. */
   function updateRanges() {
     var lim = Math.ceil(Math.max(D.W, D.L) / 2) + 5;
     $$('[data-range=pos]').forEach(function (el) {
-      if (el.type === 'range') { el.min = -lim; el.max = lim; }
+      el.min = -lim; el.max = lim;
     });
 
     /* Decoration depth follows wall thickness and layer height, so it only
@@ -401,7 +411,7 @@
         el.min = minD.toFixed(2); el.max = q[2].toFixed(2); el.step = lh.toFixed(2); el.value = q[1];
       });
     var rel = CS.faceRelief(state, f, wallT);
-    var depthTxt = rel.depth.toFixed(2) + ' mm · ' + rel.snap.layers + ' layers';
+    var depthTxt = 'Works out to ' + rel.depth.toFixed(2) + ' mm, which is ' + rel.snap.layers + ' layers of ' + lh.toFixed(2) + ' mm.';
     $('#lbl-inlay').textContent = depthTxt;
     $('#lbl-relief').textContent = depthTxt;
     $('#face-hint').textContent = f.relief === 'raised'

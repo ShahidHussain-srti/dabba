@@ -168,10 +168,8 @@
           <label class="chk"><input type="checkbox" data-bind="interior.auto"> Interior height from tallest object</label>
         </div>
         <div class="row num" data-num="interior.height" data-min="4" data-max="200" data-step="0.2" data-unit="mm" data-hide="interior.auto:true">Interior height</div>
-        <div class="row" data-hide="build:tray">
-          <label for="f-split">Base / lid split <b id="split-readout"></b></label>
-          <input id="f-split" type="range" data-bind="split" min="0.15" max="0.85" step="0.01">
-        </div>
+        <div class="row num" data-num="split" data-id="f-split" data-min="15" data-max="85" data-step="1" data-unit="%" data-scale="100" data-hide="build:tray">Base share of the height</div>
+        <p class="hint" id="split-readout" data-hide="build:tray"></p>
         <div class="row num" data-num="layerHeight" data-min="0.08" data-max="0.4" data-step="0.02" data-unit="mm">Layer height</div>
         <p class="hint" id="box-readout"></p>
       </div>
@@ -431,14 +429,10 @@
         <p class="hint" data-show="~.relief:engraved">Details are recessed into the surface. Single colour.</p>
         <p class="hint warnish" data-show="~.relief:raised">This face prints against the bed, so raised detail would be
           printed first and the whole half would rest on it. Inlay or engraved is usually better.</p>
-        <div class="row" data-show="~.relief:inlay">
-          <label for="f-inlayDepth">Inlay depth <b id="lbl-inlay"></b></label>
-          <input id="f-inlayDepth" type="range" data-bind="~.inlayDepth" min="0.6" max="3" step="0.2">
-        </div>
-        <div class="row" data-hide="~.relief:inlay">
-          <label for="f-reliefHeight">Relief depth <b id="lbl-relief"></b></label>
-          <input id="f-reliefHeight" type="range" data-bind="~.reliefHeight" min="0.6" max="3" step="0.2">
-        </div>
+        <div class="row num" data-num="~.inlayDepth" data-id="f-inlayDepth" data-min="0.6" data-max="3" data-step="0.2" data-unit="mm" data-show="~.relief:inlay">Inlay depth</div>
+        <p class="hint" id="lbl-inlay" data-show="~.relief:inlay"></p>
+        <div class="row num" data-num="~.reliefHeight" data-id="f-reliefHeight" data-min="0.6" data-max="3" data-step="0.2" data-unit="mm" data-hide="~.relief:inlay">Relief depth</div>
+        <p class="hint" id="lbl-relief" data-hide="~.relief:inlay"></p>
         <p class="hint" id="face-hint"></p>
 
         <h3>Border</h3>
@@ -543,10 +537,7 @@
               <option value="light">Light areas</option>
             </select>
           </div>
-          <div class="row" data-show="~a.source:image" data-hide="~a.mode:alpha">
-            <label for="f-a-threshold">Threshold <b id="lbl-threshold"></b></label>
-            <input id="f-a-threshold" type="range" data-bind="~a.threshold" min="0.05" max="0.95" step="0.01">
-          </div>
+          <div class="row num" data-num="~a.threshold" data-id="f-a-threshold" data-min="5" data-max="95" data-step="1" data-unit="%" data-scale="100" data-show="~a.source:image" data-hide="~a.mode:alpha">Threshold</div>
           <div data-hide="~a.source:none">
             <div class="row num" data-num="~a.size" data-min="3" data-max="250" data-step="0.5" data-unit="mm">Size</div>
             <div class="row num" data-num="~a.rotation" data-min="-180" data-max="180" data-step="1" data-unit="°">Rotation</div>
