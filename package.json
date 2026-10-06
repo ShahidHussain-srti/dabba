@@ -1,0 +1,16 @@
+{
+  "name": "dabba",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Design a hinged, multi-compartment case around objects you have measured, and export a multi-colour 3MF.",
+  "scripts": {
+    "test": "node test/run.mjs",
+    "vendor": "node tools/vendor-manifold.mjs",
+    "render-stl": "node tools/render-stl.mjs"
+  },
+  "devDependencies": {
+    "manifold-3d": "3.5.4"
+  },
+  "license": "GPL-3.0-or-later",
+  "author": "shahidhussain2k13@gmail.com"
+}

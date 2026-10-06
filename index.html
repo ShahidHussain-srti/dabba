@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- Dabba — case studio. Copyright (C) 2026 shahidhussain2k13@gmail.com
+     Licensed under the GNU General Public License v3.0 or later; see LICENSE. -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dabba — case studio</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">▣</span> Dabba <small>case studio</small></div>
+  <button id="btn-undo" class="ghost icon" title="Undo (⌘Z / Ctrl+Z)" aria-label="Undo">↶</button>
+  <button id="btn-redo" class="ghost icon" title="Redo (⇧⌘Z / Ctrl+Y)" aria-label="Redo">↷</button>
+  <div class="grow"></div>
+  <input type="text" class="namefield" aria-label="Export file name" data-bind="name" placeholder="file name" title="Export file name">
+  <label class="inline">Quality
+    <select data-bind="quality" title="Curve smoothness and decoration resolution">
+      <option value="draft">Draft</option>
+      <option value="normal" selected>Normal</option>
+      <option value="fine">Fine</option>
+      <option value="ultra">Ultra</option>
+    </select>
+  </label>
+  <button id="btn-reset" class="ghost" title="Discard this design and start over">Reset</button>
+  <button id="btn-save" class="ghost" title="Save design as JSON">Save</button>
+  <button id="btn-load" class="ghost" title="Load design JSON">Load</button>
+  <button id="btn-stl" class="ghost" title="Single-colour mesh, base and lid laid out for printing">STL</button>
+  <button id="btn-3mf" class="primary">Export 3MF</button>
+</header>
+
+<main class="layout">
+
+  <!-- ─────────────────────────── controls ─────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+
+    <section class="panel open" id="p-make">
+      <h2>Make</h2>
+      <div class="body">
+        <div class="row">
+          <div class="seg full" role="group" aria-label="What to make" data-bind="build">
+            <button value="case">Hinged case</button>
+            <button value="tray">Base only</button>
+          </div>
+        </div>
+        <div class="row inlinerow">
+          <label class="chk"><input type="checkbox" data-bind="gridfinity.enabled"> Gridfinity base</label>
+          <label class="chk" data-show="gridfinity.enabled:true"><input type="checkbox" data-bind="gridfinity.magnets"> 6×2 mm magnet holes</label>
+        </div>
+        <p class="hint" id="make-hint"></p>
+      </div>
+    </section>
+
+    <section class="panel open accent" id="p-compartment">
+      <h2>Compartments <small id="cap-sections"></small></h2>
+      <div class="body">
+        <div class="itemlist" id="sec-list"></div>
+        <div id="sec-editor">
+          <div class="row">
+            <label for="f-s-name">Name</label>
+            <input id="f-s-name" type="text" data-bind="~s.name" placeholder="e.g. Multimeter">
+          </div>
+          <div class="row">
+            <span class="lbl">Object size <i>measured, before fit clearance</i></span>
+            <div class="trio">
+              <label><span>Width</span><span class="nf" data-unit="mm"><input type="number" data-bind="~s.w" min="2" max="400" step="0.1" id="f-s-w"></span></label>
+              <label><span>Length</span><span class="nf" data-unit="mm"><input type="number" data-bind="~s.l" min="2" max="400" step="0.1"></span></label>
+              <label><span>Height</span><span class="nf" data-unit="mm"><input type="number" data-bind="~s.h" min="1" max="300" step="0.1"></span></label>
+            </div>
+          </div>
+          <div class="row">
+            <span class="lbl">Shape</span>
+            <div class="seg" role="group" aria-label="Compartment shape" data-bind="~s.shape">
+              <button value="rect">Rectangle</button>
+              <button value="round">Round / oval</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="lbl">Pocket depth <b id="sec-depth-now"></b></span>
+            <div class="inlinerow">
+              <label class="chk"><input type="checkbox" id="sec-depth-auto"> Automatic</label>
+              <span class="nf grow" data-unit="mm"><input type="number" id="sec-depth" min="1" max="300" step="0.2" aria-label="Pocket depth"></span>
+            </div>
+          </div>
+          <p class="hint" id="sec-depth-hint"></p>
+          <div class="row">
+            <span class="lbl">Sideways in its slot</span>
+            <div class="seg small full" role="group" aria-label="Horizontal alignment" data-bind="~s.alignX">
+              <button value="start">Left</button>
+              <button value="center">Centre</button>
+              <button value="end">Right</button>
+              <button value="stretch" title="Grow the cavity to fill the space instead of thickening the wall">Fill</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="lbl">Front-to-back in its slot</span>
+            <div class="seg small full" role="group" aria-label="Vertical alignment" data-bind="~s.alignY">
+              <button value="start">Back</button>
+              <button value="center">Centre</button>
+              <button value="end">Front</button>
+              <button value="stretch" title="Grow the cavity to fill the space instead of thickening the wall">Fill</button>
+            </div>
+          </div>
+          <div class="row">
+            <span class="lbl">Add a compartment</span>
+            <div class="btngrid">
+              <button class="ghost" data-add="left" title="Add to the left">← Left</button>
+              <button class="ghost" data-add="back" title="Add behind (towards the hinge)">↑ Behind</button>
+              <button class="ghost" data-add="front" title="Add in front">↓ In front</button>
+              <button class="ghost" data-add="right" title="Add to the right">Right →</button>
+            </div>
+          </div>
+          <div class="row inlinerow">
+            <button class="ghost" data-move="-1" title="Swap with the previous compartment in this row">Move earlier</button>
+            <button class="ghost" data-move="1" title="Swap with the next compartment in this row">Move later</button>
+            <div class="grow"></div>
+            <button class="ghost danger" id="btn-del-sec">Remove</button>
+          </div>
+
+          <h3>Finger notches</h3>
+          <div class="row">
+            <div class="chips" role="group" aria-label="Notch sides">
+              <label class="chip"><input type="checkbox" data-bind="~s.grooves.left"> Left</label>
+              <label class="chip"><input type="checkbox" data-bind="~s.grooves.right"> Right</label>
+              <label class="chip"><input type="checkbox" data-bind="~s.grooves.back"> Back</label>
+              <label class="chip"><input type="checkbox" data-bind="~s.grooves.front"> Front</label>
+            </div>
+          </div>
+          <div class="row num" data-num="~s.groove.width" data-min="6" data-max="40" data-step="0.5" data-unit="mm">Notch width</div>
+          <div class="row">
+            <span class="lbl">Notch depth</span>
+            <div class="inlinerow">
+              <label class="chk"><input type="checkbox" id="notch-depth-auto"> 70% of pocket</label>
+              <span class="nf grow" data-unit="mm"><input type="number" id="notch-depth" min="1" max="200" step="0.5" aria-label="Notch depth"></span>
+            </div>
+          </div>
+          <p class="hint">A round scoop in the wall beside the object, so a finger can reach in and lift it out.</p>
+        </div>
+        <p class="hint">Click a compartment in either view to select it. In the plan, drag an edge to resize,
+          use <b>+</b> to add a neighbour, or press Delete to remove one.</p>
+      </div>
+    </section>
+
+    <section class="panel open" id="p-box">
+      <h2>Fit &amp; height</h2>
+      <div class="body">
+        <div class="row num" data-num="fit" data-min="0" data-max="1.5" data-step="0.05" data-unit="mm">Fit clearance, each side</div>
+        <div class="row num" data-num="headroom" data-min="0" data-max="6" data-step="0.1" data-unit="mm">Headroom above tallest object</div>
+        <div class="row">
+          <span class="lbl">Shorter objects</span>
+          <div class="seg small full" role="group" aria-label="Pocket floors" data-bind="seat">
+            <button value="flush" title="Raise the floor so the top of each object is level with the rim">Sit flush with the rim</button>
+            <button value="floor" title="Every pocket goes down to the floor">Reach the floor</button>
+          </div>
+        </div>
+        <div class="row inlinerow">
+          <label class="chk"><input type="checkbox" data-bind="interior.auto"> Interior height from tallest object</label>
+        </div>
+        <div class="row num" data-num="interior.height" data-min="4" data-max="200" data-step="0.2" data-unit="mm" data-hide="interior.auto:true">Interior height</div>
+        <div class="row" data-hide="build:tray">
+          <label for="f-split">Base / lid split <b id="split-readout"></b></label>
+          <input id="f-split" type="range" data-bind="split" min="0.15" max="0.85" step="0.01">
+        </div>
+        <div class="row num" data-num="layerHeight" data-min="0.08" data-max="0.4" data-step="0.02" data-unit="mm">Layer height</div>
+        <p class="hint" id="box-readout"></p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-walls">
+      <h2>Walls</h2>
+      <div class="body">
+        <div class="row num" data-num="walls.side" data-min="0.8" data-max="10" data-step="0.1" data-unit="mm">Side walls</div>
+        <div class="row num" data-num="walls.bottom" data-min="0.6" data-max="8" data-step="0.1" data-unit="mm">Base floor</div>
+        <div class="row num" data-num="walls.top" data-min="0.6" data-max="8" data-step="0.1" data-unit="mm" data-hide="build:tray">Lid top</div>
+        <div class="row num" data-num="walls.inner" data-min="0.4" data-max="10" data-step="0.1" data-unit="mm">Inner walls (thinnest)</div>
+        <p class="hint">Inner walls are never thinner than this. Where neighbouring objects differ in size the wall
+          between them thickens instead, unless the compartment is set to <b>Fill</b>.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-edges">
+      <h2>Edges &amp; tapers</h2>
+      <div class="body">
+        <h3>Outside</h3>
+        <div class="row num" data-num="outer.corner" data-min="0" data-max="30" data-step="0.25" data-unit="mm">Corner radius</div>
+        <div class="row num" data-num="outer.edgeTop" data-min="0" data-max="12" data-step="0.1" data-unit="mm" data-hide="build:tray">Lid top edge</div>
+        <div class="row num" data-num="outer.edgeBottom" data-min="0" data-max="12" data-step="0.1" data-unit="mm" data-hide="gridfinity.enabled:true">Base bottom edge</div>
+        <div class="row">
+          <span class="lbl">Edge profile</span>
+          <div class="seg small" role="group" aria-label="Edge profile" data-bind="outer.edgeStyle">
+            <button value="round">Rounded</button>
+            <button value="chamfer">Chamfered</button>
+          </div>
+        </div>
+        <div class="row num" data-num="outer.taper" data-min="0" data-max="12" data-step="0.5" data-unit="°" data-hide="gridfinity.enabled:true">Wall taper</div>
+        <p class="hint">Taper leans the outside in towards the top and bottom; the parting line stays the widest point.</p>
+        <h3>Pockets</h3>
+        <div class="row num" data-num="pocket.corner" data-min="0" data-max="20" data-step="0.25" data-unit="mm">Corner radius</div>
+        <div class="row num" data-num="pocket.floor" data-min="0" data-max="10" data-step="0.1" data-unit="mm">Floor rounding</div>
+        <div class="row num" data-num="pocket.rim" data-min="0" data-max="5" data-step="0.1" data-unit="mm">Rim round-over</div>
+        <div class="row num" data-num="pocket.taper" data-min="0" data-max="15" data-step="0.5" data-unit="°">Pocket taper</div>
+        <p class="hint">Pocket taper widens each pocket towards the rim so objects lift out easily; walls are spaced
+          so their thinnest point, at the top, still meets the inner-wall setting.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-texture">
+      <h2>Texture <small>outside surfaces</small></h2>
+      <div class="body">
+        <div class="row inlinerow">
+          <label class="chk"><input type="checkbox" data-bind="texture.enabled"> Texture the outside</label>
+        </div>
+        <div data-show="texture.enabled:true">
+          <div class="row">
+            <label for="f-tex">Pattern</label>
+            <select id="f-tex" data-bind="texture.pattern"></select>
+          </div>
+          <div class="row">
+            <span class="lbl">Image tile <i>for the Image pattern — dark is deep</i></span>
+            <input type="file" id="tex-file" accept="image/*" aria-label="Upload a texture image">
+          </div>
+          <div class="row num" data-num="texture.depth" data-min="0.1" data-max="2" data-step="0.05" data-unit="mm">Depth</div>
+          <div class="row num" data-num="texture.raise" data-min="-2" data-max="2" data-step="0.05" data-unit="mm">Outer depth</div>
+          <p class="hint">Depth is high-to-low; outer depth is how far the high points stand out. At 0 the pattern is cut
+            in, its high points flush with the wall; at the depth it stands out, its low points flush. Below 0 the whole
+            pattern sinks into a recessed panel, never closer than 0.8 mm to the inside.</p>
+          <div class="row num" data-num="texture.scale" data-min="1" data-max="30" data-step="0.5" data-unit="mm">Pattern size</div>
+          <div class="row num" data-num="texture.angle" data-min="-90" data-max="90" data-step="1" data-unit="°">Angle</div>
+          <div class="row num" data-num="texture.border" data-min="0" data-max="10" data-step="0.1" data-unit="mm">Plain border</div>
+          <h3>Each side</h3>
+          <table class="texgrid">
+            <thead><tr><th></th><th>Base</th><th data-hide="build:tray">Lid</th></tr></thead>
+            <tbody>
+              <tr><th>Front</th><td><select class="texsel" data-bind="texture.sides.base.front"></select></td><td data-hide="build:tray"><select class="texsel" data-bind="texture.sides.lid.front"></select></td></tr>
+              <tr><th>Back</th><td><select class="texsel" data-bind="texture.sides.base.back"></select></td><td data-hide="build:tray"><select class="texsel" data-bind="texture.sides.lid.back"></select></td></tr>
+              <tr><th>Left</th><td><select class="texsel" data-bind="texture.sides.base.left"></select></td><td data-hide="build:tray"><select class="texsel" data-bind="texture.sides.lid.left"></select></td></tr>
+              <tr><th>Right</th><td><select class="texsel" data-bind="texture.sides.base.right"></select></td><td data-hide="build:tray"><select class="texsel" data-bind="texture.sides.lid.right"></select></td></tr>
+              <tr><th>Face</th><td><select class="texsel" data-bind="texture.sides.base.face"></select></td><td data-hide="build:tray"><select class="texsel" data-bind="texture.sides.lid.face"></select></td></tr>
+            </tbody>
+          </table>
+          <p class="hint">Face is the base underside and the lid top. Texture stops with a crisp edge, a plain border
+            short of rounded edges, the parting line and the face outline, so the halves still meet cleanly;
+            decoration is cut through it. It makes much bigger
+            files — the preview uses a coarser mesh than the export.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="p-lip" data-hide="build:tray">
+      <h2>Alignment lip</h2>
+      <div class="body">
+        <div class="row inlinerow">
+          <label class="chk"><input type="checkbox" data-bind="lip.enabled"> Lip on the base rim</label>
+        </div>
+        <div class="row num" data-num="lip.height" data-min="0.8" data-max="8" data-step="0.2" data-unit="mm" data-show="lip.enabled:true">Lip height</div>
+        <div class="row num" data-num="lip.clearance" data-min="0" data-max="0.8" data-step="0.05" data-unit="mm" data-show="lip.enabled:true">Clearance</div>
+        <div class="row" data-show="lip.enabled:true">
+          <span class="lbl">Along these edges</span>
+          <div class="chips" role="group" aria-label="Lip edges">
+            <label class="chip"><input type="checkbox" data-bind="lip.sides.back"> Back</label>
+            <label class="chip"><input type="checkbox" data-bind="lip.sides.front"> Front</label>
+            <label class="chip"><input type="checkbox" data-bind="lip.sides.left"> Left</label>
+            <label class="chip"><input type="checkbox" data-bind="lip.sides.right"> Right</label>
+          </div>
+        </div>
+        <p class="hint">The inner half of the base wall rises into a matching groove in the lid, so the halves line
+          up and close dust-tight. Untick an edge — usually the clasp side, <b id="clasp-side"></b> — and the lid's
+          groove there is filled in too, so base and lid meet flush on the inside where you reach in.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-lidinner" data-hide="build:tray">
+      <h2>Lid interior</h2>
+      <div class="body">
+        <div class="row">
+          <div class="seg small full" role="group" aria-label="Lid interior" data-bind="lidInner.mode">
+            <button value="open">Open</button>
+            <button value="mirror">Mirror compartments</button>
+          </div>
+        </div>
+        <div data-show="lidInner.mode:mirror">
+          <div class="row num" data-num="lidInner.gap" data-min="0.2" data-max="6" data-step="0.1" data-unit="mm">Gap above the base walls</div>
+          <div class="row">
+            <span class="lbl">Pocket depth in the lid</span>
+            <div class="seg small full" role="group" aria-label="Lid pocket depth" data-bind="lidInner.depth">
+              <button value="full" title="Pockets run up to the lid top">Full height</button>
+              <button value="fit" title="Pockets stop just above each object, holding it down">Fit to objects</button>
+            </div>
+          </div>
+        </div>
+        <p class="hint" data-show="lidInner.mode:open">One open space under the lid.</p>
+        <p class="hint" data-show="lidInner.mode:mirror">Walls over the base's walls, with a matching pocket over every
+          compartment. They stop the gap short of the base walls so the lid closes without rubbing; near the lip they
+          also step back by the sideways sweep the lid makes as it swings.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-hinge" data-hide="build:tray">
+      <h2>Hinge <small>filament pin</small></h2>
+      <div class="body">
+        <div class="row">
+          <span class="lbl">On the</span>
+          <div class="seg small full" role="group" aria-label="Hinge edge" data-bind="hinge.side">
+            <button value="back">Back</button>
+            <button value="right">Right</button>
+            <button value="front">Front</button>
+            <button value="left">Left</button>
+          </div>
+        </div>
+        <div class="row num" data-num="hinge.count" data-min="1" data-max="6" data-step="1" data-unit="">Hinges</div>
+        <div class="row num" data-num="hinge.knuckles" data-min="2" data-max="9" data-step="1" data-unit="">Knuckles per hinge</div>
+        <div class="row num" data-num="hinge.length" data-min="6" data-max="200" data-step="0.5" data-unit="mm">Hinge length</div>
+        <div class="row num" data-num="hinge.diameter" data-min="3" data-max="14" data-step="0.1" data-unit="mm">Knuckle diameter</div>
+        <div class="row num" data-num="hinge.pin" data-min="1" data-max="4" data-step="0.05" data-unit="mm">Pin hole</div>
+        <div class="row num" data-num="hinge.gap" data-min="0.1" data-max="1.5" data-step="0.05" data-unit="mm">Gap between knuckles</div>
+        <div class="row num" data-num="hinge.clearance" data-min="0.1" data-max="1.5" data-step="0.05" data-unit="mm">Swing clearance</div>
+        <div class="row num" data-num="hinge.inset" data-min="0" data-max="60" data-step="0.5" data-unit="mm">Inset from corners</div>
+        <p class="hint">Knuckles alternate between base and lid on one axis. Push a length of 1.75 mm filament through
+          the hole, then melt or trim the ends.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-clasp" data-hide="build:tray">
+      <h2>Clasps</h2>
+      <div class="body">
+        <div class="row">
+          <div class="seg small full" role="group" aria-label="Clasp type" data-bind="clasp.type">
+            <button value="none">None</button>
+            <button value="snap" title="Flexible tab on the lid">Snap</button>
+            <button value="hook" title="Separate hook on a pin">Hook</button>
+            <button value="swing" title="Jewellery-box swing hook">Swing</button>
+            <button value="magnet">Magnet</button>
+            <button value="bump" title="Ridges on the lip">Bump</button>
+          </div>
+        </div>
+        <p class="hint" data-show="clasp.type:snap">A flexible tab on the lid hooks into a slot in the base. Prints
+          upright with the lid, no supports; flick the grip to open.</p>
+        <p class="hint" data-show="clasp.type:hook">A separate hook pivots on a filament pin through lugs on the lid,
+          and swings down over a second filament pin held by lugs on the base. Print the hook on its side.</p>
+        <p class="hint" data-show="clasp.type:swing">A jewellery-box swing hook: a flat hook turns on a filament pin
+          set into a boss on the lid, and its curved tip threads through an eye on the base. Turn the knob to open.
+          The hook prints flat as its own piece.</p>
+        <p class="hint" data-show="clasp.type:magnet">Pockets for round magnets in the base rim and lid, meeting face
+          to face. Glue them in, minding the polarity.</p>
+        <p class="hint" data-show="clasp.type:bump">Small ridges on the alignment lip click into matching dimples in
+          the lid. Needs the lip.</p>
+        <div data-hide="clasp.type:none">
+          <div class="row num" data-num="clasp.count" data-min="1" data-max="6" data-step="1" data-unit="">Count</div>
+          <div class="row num" data-num="clasp.width" data-min="4" data-max="60" data-step="0.5" data-unit="mm">Width</div>
+          <div data-show="clasp.type:snap">
+            <div class="row num" data-num="clasp.thickness" data-min="0.8" data-max="4" data-step="0.1" data-unit="mm">Tab thickness</div>
+            <div class="row num" data-num="clasp.reach" data-min="2" data-max="30" data-step="0.5" data-unit="mm">Reach below the rim</div>
+            <div class="row num" data-num="clasp.catch" data-min="0.3" data-max="3" data-step="0.05" data-unit="mm">Hook depth</div>
+            <div class="row inlinerow"><label class="chk"><input type="checkbox" data-bind="clasp.grip"> Grip lip to flick it open</label></div>
+          </div>
+          <div data-show="clasp.type:hook|swing">
+            <div class="row num" data-num="clasp.latchD" data-min="4" data-max="14" data-step="0.1" data-unit="mm">Lug / hub diameter</div>
+            <div class="row num" data-num="clasp.latchDrop" data-min="0" data-max="20" data-step="0.5" data-unit="mm">Extra hook length</div>
+          </div>
+          <div data-show="clasp.type:magnet">
+            <div class="row num" data-num="clasp.magnetD" data-min="2" data-max="20" data-step="0.5" data-unit="mm">Magnet diameter</div>
+            <div class="row num" data-num="clasp.magnetH" data-min="0.5" data-max="10" data-step="0.5" data-unit="mm">Magnet thickness</div>
+          </div>
+          <div data-show="clasp.type:bump">
+            <div class="row num" data-num="clasp.bumpR" data-min="0.3" data-max="2" data-step="0.05" data-unit="mm">Bump radius</div>
+          </div>
+          <div class="row num" data-num="clasp.clearance" data-min="0.05" data-max="0.8" data-step="0.05" data-unit="mm">Clearance</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="p-decor">
+      <h2>Decoration <small id="cap-face"></small></h2>
+      <div class="body">
+        <div class="row">
+          <div class="seg full" role="group" aria-label="Which face to decorate" data-bind="activeFace">
+            <button value="lid" data-hide="build:tray">Lid top</button>
+            <button value="base">Base underside</button>
+          </div>
+        </div>
+        <div class="row inlinerow">
+          <label class="chk"><input type="checkbox" id="face-enabled"> Decorate this face</label>
+        </div>
+        <div class="row">
+          <span class="lbl">Relief style</span>
+          <div class="seg full" role="group" aria-label="Relief style" data-bind="~.relief">
+            <button value="inlay">Inlay</button>
+            <button value="engraved">Engraved</button>
+            <button value="raised">Raised</button>
+          </div>
+        </div>
+        <p class="hint" data-show="~.relief:inlay">Details are filled with their own colour, flush with the surface —
+          crisp, since this face prints against the bed. Needs a multi-material printer.</p>
+        <p class="hint" data-show="~.relief:engraved">Details are recessed into the surface. Single colour.</p>
+        <p class="hint warnish" data-show="~.relief:raised">This face prints against the bed, so raised detail would be
+          printed first and the whole half would rest on it. Inlay or engraved is usually better.</p>
+        <div class="row" data-show="~.relief:inlay">
+          <label for="f-inlayDepth">Inlay depth <b id="lbl-inlay"></b></label>
+          <input id="f-inlayDepth" type="range" data-bind="~.inlayDepth" min="0.6" max="3" step="0.2">
+        </div>
+        <div class="row" data-hide="~.relief:inlay">
+          <label for="f-reliefHeight">Relief depth <b id="lbl-relief"></b></label>
+          <input id="f-reliefHeight" type="range" data-bind="~.reliefHeight" min="0.6" max="3" step="0.2">
+        </div>
+        <p class="hint" id="face-hint"></p>
+
+        <h3>Border</h3>
+        <div class="row">
+          <select id="f-b-style" data-bind="~.border.style" aria-label="Border style"></select>
+        </div>
+        <div data-hide="~.border.style:none">
+          <div class="row">
+            <label for="f-b-shape">Follows</label>
+            <select id="f-b-shape" data-bind="~.border.shape">
+              <option value="follow">The face outline</option>
+              <option value="rect">Rectangle</option>
+              <option value="circle">Circle</option>
+              <option value="ellipse">Ellipse</option>
+              <option value="pill">Capsule</option>
+              <option value="hex">Hexagon</option>
+              <option value="oct">Octagon</option>
+              <option value="star">Star</option>
+              <option value="heart">Heart</option>
+              <option value="shield">Shield</option>
+            </select>
+          </div>
+          <div class="row num" data-num="~.border.inset" data-min="0" data-max="30" data-step="0.25" data-unit="mm">Inset from edge</div>
+          <div class="row num" data-num="~.border.width" data-min="0.4" data-max="10" data-step="0.1" data-unit="mm">Line width</div>
+          <div class="row num" data-num="~.border.gap" data-min="0.4" data-max="8" data-step="0.1" data-unit="mm"
+               data-show="~.border.style:double|triple|thinthick|groove|wave|zigzag|scallop|braid|wavedash"><span id="lbl-b-gap">Gap</span></div>
+          <div class="row num" data-num="~.border.dashes" data-min="4" data-max="120" data-step="1" data-unit=""
+               data-show="~.border.style:dashed|dotted|dashdot|beads|ticks|wave|zigzag|scallop|braid|wavedash"><span id="lbl-b-dashes">Count</span></div>
+          <div class="row num" data-num="~.border.radius" data-min="0" data-max="20" data-step="0.25" data-unit="mm"
+               data-hide="~.border.shape:follow">Corner radius</div>
+        </div>
+
+        <h3>Text</h3>
+        <div class="itemlist" id="text-list"></div>
+        <div class="row inlinerow">
+          <button class="ghost" id="btn-add-text">+ Add text</button>
+          <button class="ghost danger" id="btn-del-text">Remove</button>
+        </div>
+        <div id="text-editor">
+          <div class="row">
+            <textarea aria-label="Text" data-bind="~t.content" rows="2" placeholder="Your text — Enter for a new line"></textarea>
+          </div>
+          <div class="row">
+            <label for="font-select">Font</label>
+            <select data-bind="~t.font" id="font-select"></select>
+          </div>
+          <div class="row inlinerow">
+            <div class="seg small" role="group" aria-label="Text style" data-bind="~t.style">
+              <button value="fill">Solid</button>
+              <button value="outline">Outline</button>
+            </div>
+            <label class="chk"><input type="checkbox" data-bind="~t.bold"> Bold</label>
+            <label class="chk"><input type="checkbox" data-bind="~t.italic"> Italic</label>
+          </div>
+          <div class="row num" data-num="~t.strokeWidth" data-min="0.3" data-max="3" data-step="0.1" data-unit="mm" data-show="~t.style:outline">Stroke width</div>
+          <div class="row num" data-num="~t.size" data-min="2" data-max="80" data-step="0.25" data-unit="mm">Size</div>
+          <div class="row num" data-num="~t.tracking" data-min="-1" data-max="6" data-step="0.05" data-unit="mm">Letter spacing</div>
+          <div class="row num" data-num="~t.lineHeight" data-min="0.8" data-max="2" data-step="0.05" data-unit="×">Line height</div>
+          <div class="row num" data-num="~t.rotation" data-min="-180" data-max="180" data-step="1" data-unit="°">Rotation</div>
+          <div class="row inlinerow">
+            <div class="seg small" role="group" aria-label="Text alignment" data-bind="~t.align">
+              <button value="left">Left</button>
+              <button value="center">Centre</button>
+              <button value="right">Right</button>
+            </div>
+            <button class="ghost" data-center="text">Centre on face</button>
+          </div>
+          <div class="row num" data-num="~t.x" data-min="-100" data-max="100" data-step="0.25" data-unit="mm" data-range="pos">Position across</div>
+          <div class="row num" data-num="~t.y" data-min="-100" data-max="100" data-step="0.25" data-unit="mm" data-range="pos">Position up/down</div>
+          <div class="row">
+            <label for="f-t-color">Colour</label>
+            <input id="f-t-color" type="color" class="colorfield" data-bind="~t.color">
+          </div>
+        </div>
+
+        <h3>Pictures</h3>
+        <div class="itemlist" id="art-list"></div>
+        <div class="row inlinerow">
+          <button class="ghost" id="btn-add-art">+ Add picture</button>
+          <button class="ghost danger" id="btn-del-art">Remove</button>
+        </div>
+        <div id="art-editor">
+          <div class="row">
+            <div class="seg" role="group" aria-label="Picture source" data-bind="~a.source">
+              <button value="none">Empty</button>
+              <button value="image">Upload</button>
+              <button value="draw">Draw</button>
+            </div>
+          </div>
+          <div class="row" data-show="~a.source:image">
+            <input type="file" id="art-file" accept="image/*" aria-label="Upload a picture">
+          </div>
+          <div class="row" data-show="~a.source:draw">
+            <button class="ghost wide" data-draw="art">Open drawing pad…</button>
+          </div>
+          <div class="row" data-show="~a.source:image">
+            <label for="f-a-mode">Trace</label>
+            <select id="f-a-mode" data-bind="~a.mode">
+              <option value="auto">Auto</option>
+              <option value="alpha">Transparency</option>
+              <option value="dark">Dark areas</option>
+              <option value="light">Light areas</option>
+            </select>
+          </div>
+          <div class="row" data-show="~a.source:image" data-hide="~a.mode:alpha">
+            <label for="f-a-threshold">Threshold <b id="lbl-threshold"></b></label>
+            <input id="f-a-threshold" type="range" data-bind="~a.threshold" min="0.05" max="0.95" step="0.01">
+          </div>
+          <div data-hide="~a.source:none">
+            <div class="row num" data-num="~a.size" data-min="3" data-max="250" data-step="0.5" data-unit="mm">Size</div>
+            <div class="row num" data-num="~a.rotation" data-min="-180" data-max="180" data-step="1" data-unit="°">Rotation</div>
+            <div class="row inlinerow">
+              <label class="chk"><input type="checkbox" data-bind="~a.mirror"> Mirror</label>
+              <button class="ghost" data-center="art">Centre on face</button>
+            </div>
+            <div class="row num" data-num="~a.x" data-min="-100" data-max="100" data-step="0.25" data-unit="mm" data-range="pos">Position across</div>
+            <div class="row num" data-num="~a.y" data-min="-100" data-max="100" data-step="0.25" data-unit="mm" data-range="pos">Position up/down</div>
+          </div>
+          <div class="row">
+            <label for="f-a-color">Colour</label>
+            <input id="f-a-color" type="color" class="colorfield" data-bind="~a.color">
+          </div>
+        </div>
+        <p class="hint">Switch the plan view to <b>Lid top</b> or <b>Base underside</b> to drag text and pictures;
+          corner handles resize, arrow keys nudge.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-colours">
+      <h2>Colours <small>one per element</small></h2>
+      <div class="body">
+        <div class="row duo">
+          <label><span>Base</span><input type="color" class="colorfield" data-bind="colors.base" aria-label="Base colour"></label>
+          <label data-hide="build:tray"><span>Lid</span><input type="color" class="colorfield" data-bind="colors.lid" aria-label="Lid colour"></label>
+        </div>
+        <div class="row">
+          <label for="f-b-color">Border (this face)</label>
+          <input id="f-b-color" type="color" class="colorfield" data-bind="~.border.color">
+        </div>
+        <div class="swatchlist" id="used-colours"></div>
+        <p class="hint" id="color-count"></p>
+      </div>
+    </section>
+
+    <p class="legal">Dabba · © 2026 shahidhussain2k13@gmail.com · free software under the
+      <a href="LICENSE" target="_blank" rel="noopener">GNU GPL v3 or later</a>.
+      Bundles <a href="vendor/LICENSE-manifold.txt" target="_blank" rel="noopener">Manifold</a> (Apache-2.0).</p>
+  </aside>
+
+  <!-- ─────────────────────────── viewport ─────────────────────────── -->
+  <div class="viewport">
+    <div class="vptabs">
+      <div class="seg" id="panetabs" role="group" aria-label="Panes">
+        <button value="plan">Plan</button>
+        <button value="both" class="on">Plan + 3D</button>
+        <button value="3d">3D</button>
+      </div>
+      <div class="grow"></div>
+      <span class="stat" id="stat-dims"></span>
+      <span class="stat" id="stat-tris"></span>
+      <span class="stat" id="stat-mass"></span>
+    </div>
+
+    <div class="panes" id="panes" data-pane="both">
+      <section class="pane" id="pane-2d">
+        <div class="panebar">
+          <div class="seg small" id="planmode" role="group" aria-label="What the plan shows">
+            <button value="plan" class="on">Compartments</button>
+            <button value="lid" data-hide="build:tray">Lid top</button>
+            <button value="base">Base underside</button>
+          </div>
+        </div>
+        <div class="stage" id="stage2d">
+          <canvas id="cplan" tabindex="0" aria-label="Compartment plan — click to select, drag edges to resize"></canvas>
+          <canvas id="cface" tabindex="0" hidden aria-label="Face decoration — click an element to select, drag to move"></canvas>
+          <div class="hud" id="hud2d">click to select · drag an edge to resize · <b>+</b> adds a neighbour · Delete removes</div>
+        </div>
+      </section>
+      <section class="pane" id="pane-3d">
+        <div class="panebar">
+          <div class="seg small" id="pose" role="group" aria-label="3D pose" data-hide="build:tray">
+            <button value="closed">Closed</button>
+            <button value="open" class="on">Open</button>
+            <button value="print">Print layout</button>
+          </div>
+          <label class="inline" id="angle-wrap" data-hide="build:tray">Lid
+            <input type="range" id="open-angle" min="0" max="180" step="1" value="105" aria-label="Lid opening angle">
+            <b id="open-angle-val">105°</b>
+          </label>
+        </div>
+        <div class="stage" id="stage3d">
+          <canvas id="c3d"></canvas>
+          <div class="hud">drag to orbit · scroll to zoom · shift-drag to pan · click a compartment to select it</div>
+        </div>
+      </section>
+      <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busy-text">Building…</span></div>
+    </div>
+
+    <div class="warnings" id="warnings"></div>
+  </div>
+</main>
+
+<!-- ─────────────────────────── drawing modal ─────────────────────────── -->
+<div class="modal" id="drawmodal" hidden>
+  <div class="sheet">
+    <header>
+      <strong id="draw-title">Drawing pad</strong>
+      <div class="grow"></div>
+      <button class="ghost" id="draw-cancel">Cancel</button>
+      <button class="primary" id="draw-apply">Apply</button>
+    </header>
+    <div class="drawbody">
+      <canvas id="drawcanvas" width="540" height="540"></canvas>
+      <div class="drawtools">
+        <div class="seg vert" id="draw-tool" role="group" aria-label="Drawing tool">
+          <button value="brush" class="on">Brush</button>
+          <button value="eraser">Eraser</button>
+          <button value="line">Line</button>
+          <button value="rect">Rect</button>
+          <button value="ellipse">Ellipse</button>
+        </div>
+        <label for="draw-size">Size <b id="draw-size-val">14</b></label>
+        <input type="range" id="draw-size" aria-label="Brush size" min="2" max="90" step="1" value="14">
+        <label class="chk" id="draw-fill-wrap"><input type="checkbox" id="draw-fill"> Fill enclosed areas</label>
+        <button class="ghost" id="draw-undo">Undo</button>
+        <button class="ghost" id="draw-clear">Clear</button>
+        <p class="hint" id="draw-hint"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="loadfile" accept="application/json" aria-label="Load a saved design" hidden>
+
+<script src="vendor/manifold.js"></script>
+<script src="src/util.js"></script>
+<script src="src/edt.js"></script>
+<script src="src/contour.js"></script>
+<script src="src/shapes.js"></script>
+<script src="src/raster.js"></script>
+<script src="src/texture.js"></script>
+<script src="src/layout.js"></script>
+<script src="src/geometry.js"></script>
+<script src="src/zip.js"></script>
+<script src="src/export.js"></script>
+<script src="src/gl.js"></script>
+<script src="src/plan.js"></script>
+<script src="src/face.js"></script>
+<script src="src/drawpad.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
