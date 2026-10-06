@@ -611,9 +611,20 @@ window.CS = window.CS || {};
     ws.sideOf = function (nx, ny) {
       return Math.abs(nx) >= Math.abs(ny) ? (nx > 0 ? 'right' : 'left') : (ny > 0 ? 'back' : 'front');
     };
+    /* The pattern's join goes in the middle of the hinge side (the back of a
+       tray), where it shows least. */
+    var seamSide = D.tray ? 'back' : D.side;
+    var seamAt = { right: ws.segs[0][2] / 2 }[seamSide];
+    if (seamAt === undefined) {
+      var order = { R: 'right', T: 'back', L: 'left', B: 'front' }, acc2 = 0;
+      ws.segs.forEach(function (sg) {
+        if (order[sg[0]] === seamSide) seamAt = acc2 + sg[2] / 2;
+        acc2 += sg[2];
+      });
+    }
     ws.samplers = {};
     ['front', 'back', 'left', 'right'].forEach(function (k) {
-      if (pats[k]) ws.samplers[k] = CS.texSampler(pats[k], T.scale, T.angle, ws.perimeter);
+      if (pats[k]) ws.samplers[k] = CS.texSampler(pats[k], T.scale, T.angle, ws.perimeter, seamAt);
     });
     var zones = D.plainZones || [];
     ws.plainAt = function (side, x, y, z) {

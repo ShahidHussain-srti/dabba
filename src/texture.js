@@ -22,31 +22,43 @@ window.CS = window.CS || {};
     h = Math.imul(h ^ (h >>> 13), 1274126177);
     return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
   }
-  function vnoise(x, y) {
+  /* Noise can be made to repeat every `pc` lattice cells along x (0 = never),
+     so a pattern that wraps round the case meets its own start seamlessly. */
+  function wrapI(i, pc) { return pc > 0 ? ((i % pc) + pc) % pc : i; }
+  function vnoise(x, y, pc) {
     var ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
     var ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
-    var a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+    var i0 = wrapI(ix, pc), i1 = wrapI(ix + 1, pc);
+    var a = hash(i0, iy), b = hash(i1, iy), c = hash(i0, iy + 1), d = hash(i1, iy + 1);
     return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
   }
   /* Octaves are capped by the caller: the mesh samples about 14 times per
      pattern unit, so anything finer than ~4 cycles per unit only aliases into
-     grit. */
-  function fbm(x, y, octaves) {
+     grit. Doubling the frequency doubles the wrap, so every octave repeats too. */
+  function fbm(x, y, octaves, pc) {
     var n = octaves || 3, v = 0, amp = 0.5, f = 1, norm = 0;
-    for (var o = 0; o < n; o++) { v += amp * vnoise(x * f, y * f); norm += amp; f *= 2; amp *= 0.5; }
+    for (var o = 0; o < n; o++) { v += amp * vnoise(x * f, y * f, (pc || 0) * f); norm += amp; f *= 2; amp *= 0.5; }
     return v / norm;
   }
   /* Distances to the nearest and second-nearest jittered cell point. */
-  function worley(x, y) {
+  function worley(x, y, pc) {
     var ix = Math.floor(x), iy = Math.floor(y), f1 = 9, f2 = 9;
     for (var j = -1; j <= 1; j++) for (var i = -1; i <= 1; i++) {
-      var cx = ix + i, cy = iy + j;
-      var px = cx + 0.15 + 0.7 * hash(cx, cy), py = cy + 0.15 + 0.7 * hash(cy * 7 + 3, cx * 13 + 1);
+      var cx = ix + i, cy = iy + j, hx = wrapI(cx, pc || 0);
+      var px = cx + 0.15 + 0.7 * hash(hx, cy), py = cy + 0.15 + 0.7 * hash(cy * 7 + 3, hx * 13 + 1);
       var d = Math.hypot(x - px, y - py);
       if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
     }
     return [f1, f2];
   }
+  /* A noise frequency along x that fits a whole number of cells into a wrap of
+     W units: returns [x frequency, cells per wrap]. Without a wrap, as asked. */
+  function wf(freq, W) {
+    if (!(W > 0)) return [freq, 0];
+    var cells = Math.max(1, Math.round(W * freq));
+    return [cells / W, cells];
+  }
+
   /* Offset to the centre of the nearest cell of a unit hexagonal grid. */
   function hexCell(x, y) {
     var rx = 1, ry = 1.7320508, hx = 0.5, hy = 0.8660254;
@@ -73,15 +85,15 @@ window.CS = window.CS || {};
       var dy = Math.min(frac(yy), 1 - frac(yy)) * 0.5, dx = Math.min(frac(ox), 1 - frac(ox));
       return 1 - sstep(0.04, 0.11, Math.min(dx, dy));
     },
-    voronoi: function (x, y) {
-      var w = worley(x, y);
+    voronoi: function (x, y, W) {
+      var q = wf(1, W), w = worley(x * q[0], y, q[1]);
       return Math.max(1 - sstep(0, 0.17, w[1] - w[0]), 0.3 * w[0]);
     },
-    leather: function (x, y) {
-      var w = worley(x * 1.6, y * 1.6);
-      return 0.65 * (1 - sstep(0, 0.16, w[1] - w[0])) + 0.35 * fbm(x * 1.5, y * 1.5, 2);
+    leather: function (x, y, W) {
+      var q = wf(1.6, W), r = wf(1.5, W), w = worley(x * q[0], y * 1.6, q[1]);
+      return 0.65 * (1 - sstep(0, 0.16, w[1] - w[0])) + 0.35 * fbm(x * r[0], y * 1.5, 2, r[1]);
     },
-    noise: function (x, y) { return fbm(x * 1.2, y * 1.2, 2); },
+    noise: function (x, y, W) { var q = wf(1.2, W); return fbm(x * q[0], y * 1.2, 2, q[1]); },
     /* Over-and-under threads, one each way per repeat, with gaps between.
        At each crossing the thread on top alternates (cos π(x+y) flips sign
        from one crossing to the next), and both profiles are smooth. */
@@ -133,16 +145,17 @@ window.CS = window.CS || {};
       var a = CS.clamp(Math.sin(Math.PI * x) * 3, -1, 1), b = CS.clamp(Math.sin(Math.PI * y) * 3, -1, 1);
       return 0.5 - 0.5 * a * b;
     },
-    wood: function (x, y) {
-      var t = y + 0.45 * fbm(x * 0.35, y * 0.9, 2) + 0.15 * Math.sin(x * 0.7);
+    wood: function (x, y, W) {
+      var q = wf(0.35, W), r = wf(0.12, W);
+      var t = y + 0.45 * fbm(x * q[0], y * 0.9, 2, q[1]) + 0.3 * fbm(x * r[0], y * 0.05, 1, r[1]);
       return 0.5 + 0.5 * Math.cos(TAU * t * 2.5);
     },
     crosshatch: function (x, y) {
       var a = 0.5 + 0.5 * Math.cos(TAU * (x + y) * 1.5), b = 0.5 + 0.5 * Math.cos(TAU * (x - y) * 1.5);
       return Math.pow(Math.max(a, b), 1.5);
     },
-    topo: function (x, y) {
-      var n = fbm(x * 0.3, y * 0.3, 2) * 6, g = Math.min(frac(n), 1 - frac(n));
+    topo: function (x, y, W) {
+      var q = wf(0.3, W), n = fbm(x * q[0], y * 0.3, 2, q[1]) * 6, g = Math.min(frac(n), 1 - frac(n));
       return 1 - sstep(0.05, 0.22, g);
     },
     studs: function (x, y) {
@@ -153,12 +166,12 @@ window.CS = window.CS || {};
       var r = Math.hypot(frac(x) - 0.5, frac(y) - 0.5) / 0.34;
       return r < 1 ? Math.sqrt(1 - r * r) : 0;
     },
-    bubbles: function (x, y) {
-      var w = worley(x * 1.3, y * 1.3), r = w[0] / 0.42;
+    bubbles: function (x, y, W) {
+      var q = wf(1.3, W), w = worley(x * q[0], y * 1.3, q[1]), r = w[0] / 0.42;
       return r < 1 ? Math.sqrt(1 - r * r) : 0;
     },
-    crystal: function (x, y) {
-      var w = worley(x, y);
+    crystal: function (x, y, W) {
+      var q = wf(1, W), w = worley(x * q[0], y, q[1]);
       return CS.clamp(w[0] * 1.6, 0, 1);
     },
     /* 2:1 planks, alternately lying and standing, on the lattice spanned by
@@ -205,18 +218,57 @@ window.CS = window.CS || {};
 
   CS.texReady = function (name) { return name !== 'image' || !!(CS.assets && CS.assets.texture); };
 
+  /* How far each pattern runs along x before repeating, in pattern units.
+     'wrap' marks the noise patterns, which repeat only when told a wrap. */
+  var PERIOD = {
+    knurl: 1, pyramids: 1, crosshatch: 2 / 3, ribs: 1, chevron: 1, waves: 1, hex: 1, triangles: 1,
+    waffle: 1, tiles: 1, checker: 2, bricks: 1, herringbone: 4 / 3, weave: 2, diamondplate: 2,
+    scales: 1, dimples: 1, studs: 1, mesh: 1, rings: 1, image: 1,
+    bubbles: 'wrap', voronoi: 'wrap', crystal: 'wrap', leather: 'wrap', wood: 'wrap', topo: 'wrap', noise: 'wrap'
+  };
+  CS.texPeriod = function (name) { return PERIOD[name]; };
+
   /* A sampler in millimetres: pattern size `scale`, turned by `angle` degrees.
-     `period` (optional) bends the u scale so a whole number of repeats wraps
-     around the case, leaving no seam where the perimeter closes. */
-  CS.texSampler = function (name, scale, angle, period) {
+
+     Round a wall (`period` = the perimeter, `seamAt` = where the pattern should
+     start), the pattern has to meet itself again. Unrotated, the u scale bends
+     slightly so a whole number of repeats fits — for noise, the noise itself is
+     told to repeat — and the join is invisible. A rotated pattern can't wrap
+     exactly, so it cross-fades with its own start over one repeat before the
+     join. */
+  CS.texSampler = function (name, scale, angle, period, seamAt) {
     var f = P[name];
     if (!f) return null;
     var s = Math.max(0.5, scale), a = (angle || 0) * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
-    var su = s;
-    if (period && Math.abs(angle || 0) < 0.01) su = period / Math.max(1, Math.round(period / s));
+    var rotated = Math.abs(angle || 0) >= 0.01;
+    if (!period) {
+      return function (u, v) {
+        return CS.clamp(rotated ? f((u * c - v * sn) / s, (u * sn + v * c) / s, 0) : f(u / s, v / s, 0), 0, 1);
+      };
+    }
+    var off = seamAt || 0, per = PERIOD[name], su = s, W = 0;
+    if (!rotated) {
+      if (per === 'wrap') {
+        var n = Math.max(1, Math.round(period / s));
+        su = period / n; W = n;
+      } else {
+        var reps = Math.max(1, Math.round(period / (s * per)));
+        su = period / (reps * per);
+      }
+    }
+    var band = Math.min(s, period * 0.25);
+    var at = function (u, v) {
+      return rotated ? f((u * c - v * sn) / s, (u * sn + v * c) / s, 0) : f(u / su, v / s, W);
+    };
     return function (u, v) {
-      if (a === 0) return CS.clamp(f(u / su, v / s), 0, 1);
-      return CS.clamp(f((u * c - v * sn) / s, (u * sn + v * c) / s), 0, 1);
+      var uu = ((u - off) % period + period) % period;
+      var val = at(uu, v);
+      if (rotated && uu > period - band) {
+        var t = (uu - (period - band)) / band;
+        t = t * t * (3 - 2 * t);
+        val = val * (1 - t) + at(uu - period, v) * t;
+      }
+      return CS.clamp(val, 0, 1);
     };
   };
 
