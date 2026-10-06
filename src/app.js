@@ -1161,6 +1161,10 @@
       });
     })(d, ps);
 
+    // "Mirror compartments" at full height was walls only before it had a name.
+    if (ps.lidInner && ps.lidInner.mode === 'mirror' && ps.lidInner.depth === 'full') {
+      d.lidInner.mode = 'walls'; d.lidInner.depth = 'mirror';
+    }
     if (ps.texture && ps.texture.border != null && !ps.texture.borders) {
       var b0 = ps.texture.border;
       d.texture.borders = { base: { bottom: b0, top: b0, face: b0 }, lid: { bottom: b0, top: b0, face: b0 } };

@@ -1029,7 +1029,8 @@ window.CS = window.CS || {};
        so the base rim lands on the lid's lower face and depth, floor rounding,
        rim round-over, taper and the shapes inside all match, face to face. A
        pocket deeper than the lid simply opens up to the lid top. */
-    if (LI.depth === 'mirror' && baseCuts) {
+    var depthMode = LI.mode === 'walls' ? 'full' : LI.depth;   // walls only: pockets open to the lid top
+    if (depthMode === 'mirror' && baseCuts) {
       var zm = D.zP + gap / 2;
       var mirrored = baseCuts.filter(Boolean).map(function (c) {
         return S.k(S.k(c.mirror([0, 0, 1])).translate([0, 0, 2 * zm]));
@@ -1040,7 +1041,7 @@ window.CS = window.CS || {};
     var pockets = D.rects.map(function (rc) {
       var s = rc.node, gTop = s._depth * s._tanP;
       var dl = D.Ht + 1;
-      if (LI.depth === 'fit') {
+      if (depthMode === 'fit') {
         var up = Math.max(0, s.h - s._depth) + Math.max(0.3, state.headroom);
         dl = Math.max(gap + 0.6, up);
         if (dl > D.Ht - 0.3) dl = D.Ht + 1;
@@ -1314,7 +1315,8 @@ window.CS = window.CS || {};
                              D.zP - 1, D.zP + D.lipH + D.lipC);
           lid = sub(S, lid, sub(S, groove, lipCuts(S, D, 0)));
         }
-        if (state.lidInner && state.lidInner.mode === 'mirror') lid = mirrorLid(S, D, state, lid, lidShell, cuts);
+        var LIm = state.lidInner && state.lidInner.mode;
+        if (LIm === 'mirror' || LIm === 'walls') lid = mirrorLid(S, D, state, lid, lidShell, cuts);
       }
 
       /* Into the canonical frame for the hinge and clasps, then back. */

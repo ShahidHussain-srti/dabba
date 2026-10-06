@@ -349,6 +349,17 @@ console.log('lid mirrors the base');
   }
   check('each lid slice matches the base slice it mirrors', rows.length >= 3 && worst < 0.02, rows.join(' '));
   base.delete(); lid.delete();
+  // Walls only: dividers over the base walls, open over each compartment.
+  const w = JSON.parse(JSON.stringify(s)); w.lidInner.mode = 'walls';
+  const mw = CS.buildModel(w, { decor: false }), lw = toManifold(wasm, mw.parts.find(p => p.key === 'lid'));
+  const open = CS.buildModel(Object.assign(JSON.parse(JSON.stringify(s)), { lidInner: { mode: 'open', gap: gap, depth: 'mirror' } }), { decor: false });
+  const lo = toManifold(wasm, open.parts.find(p => p.key === 'lid'));
+  const z2 = zm + 2, sw = slab(lw, z2), so = slab(lo, z2), sm = slab(toManifold(wasm, m.parts.find(p => p.key === 'lid')), z2);
+  const r0 = D.rects[0], probe = wasm.Manifold.cube([2, 2, 0.1], true).translate([r0.cx, r0.cy, z2]);
+  const overPocket = lw.intersect(probe).volume();
+  check('walls only: dividers in the lid, nothing over the compartments', sw > so + 0.5 && Math.abs(sw - sm) / sm < 0.15 && overPocket < 1e-6,
+        'walls ' + sw.toFixed(1) + ', open ' + so.toFixed(1) + ', mirror ' + sm.toFixed(1) + ', over pocket ' + overPocket.toFixed(4));
+  probe.delete(); lw.delete(); lo.delete();
   check('the mirrored lid is a valid solid', m.parts.every(p => { const t = toManifold(wasm, p); const ok = t.status() === 'NoError'; t.delete(); return ok; }));
 }
 
