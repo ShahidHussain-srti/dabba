@@ -799,6 +799,10 @@
   }
 
   function onEdit(path, el) {
+    if (path === 'texture.border') {
+      var b = state.texture.border;
+      state.texture.borders = { base: { bottom: b, top: b, face: b }, lid: { bottom: b, top: b, face: b } };
+    }
     if (path === 'activeFace') {
       face.selected = null;
       face.invalidateBorder();
@@ -1069,6 +1073,11 @@
         } else { dst[k] = src[k]; }
       });
     })(d, ps);
+
+    if (ps.texture && ps.texture.border != null && !ps.texture.borders) {
+      var b0 = ps.texture.border;
+      d.texture.borders = { base: { bottom: b0, top: b0, face: b0 }, lid: { bottom: b0, top: b0, face: b0 } };
+    }
 
     if (ps.layout && (ps.layout.kind === 'section' || ps.layout.kind === 'split')) {
       d.layout = (function fix(n) {

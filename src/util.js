@@ -126,6 +126,8 @@ window.CS = window.CS || {};
       gridfinity: { enabled: false, magnets: true },
       texture: {
         enabled: false, pattern: 'knurl', depth: 0.5, raise: 0, scale: 4, angle: 0, border: 1, engine: 'fine',
+        // plain band at each edge of the texture, per half (bottom/top as closed)
+        borders: { base: { bottom: 1, top: 1, face: 1 }, lid: { bottom: 1, top: 1, face: 1 } },
         sides: {
           base: { front: 'all', back: 'all', left: 'all', right: 'all', face: 'none' },
           lid:  { front: 'all', back: 'all', left: 'all', right: 'all', face: 'none' }

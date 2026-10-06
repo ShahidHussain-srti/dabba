@@ -91,6 +91,11 @@ function variants() {
   r4.texture.enabled = true; r4.texture.pattern = 'ribs'; r4.texture.depth = 0.6; r4.texture.raise = -2;
   out.push(['outer depth far below zero is held back', r4]);
 
+  const b1 = CS.defaults();
+  b1.texture.enabled = true; b1.texture.pattern = 'ribs'; b1.texture.sides.lid.face = 'all'; b1.faces.lid.enabled = false;
+  b1.texture.borders = { base: { bottom: 0, top: 3, face: 1 }, lid: { bottom: 2.5, top: 0, face: 4 } };
+  out.push(['different border on every edge', b1]);
+
   const g1 = CS.defaults();
   g1.gridfinity.enabled = true; g1.texture.enabled = true; g1.texture.pattern = 'voronoi'; g1.texture.depth = 0.4;
   out.push(['gridfinity case with stone texture', g1]);

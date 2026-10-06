@@ -229,7 +229,24 @@
             pattern sinks into a recessed panel, never closer than 0.8 mm to the inside.</p>
           <div class="row num" data-num="texture.scale" data-min="1" data-max="30" data-step="0.5" data-unit="mm">Pattern size</div>
           <div class="row num" data-num="texture.angle" data-min="-90" data-max="90" data-step="1" data-unit="°">Angle</div>
-          <div class="row num" data-num="texture.border" data-min="0" data-max="10" data-step="0.1" data-unit="mm">Plain border</div>
+          <h3>Plain borders</h3>
+          <div class="row num" data-num="texture.border" data-min="0" data-max="10" data-step="0.1" data-unit="mm">All borders</div>
+          <table class="texgrid bordergrid">
+            <thead><tr><th></th><th>Bottom edge</th><th>Top edge</th><th>Face</th></tr></thead>
+            <tbody>
+              <tr><th>Base</th>
+                <td><span class="nf" data-unit="mm"><input type="number" min="0" step="0.1" data-bind="texture.borders.base.bottom" aria-label="Base bottom-edge border"></span></td>
+                <td><span class="nf" data-unit="mm"><input type="number" min="0" step="0.1" data-bind="texture.borders.base.top" aria-label="Base top-edge border"></span></td>
+                <td><span class="nf" data-unit="mm"><input type="number" min="0" step="0.1" data-bind="texture.borders.base.face" aria-label="Base underside border"></span></td></tr>
+              <tr data-hide="build:tray"><th>Lid</th>
+                <td><span class="nf" data-unit="mm"><input type="number" min="0" step="0.1" data-bind="texture.borders.lid.bottom" aria-label="Lid bottom-edge border"></span></td>
+                <td><span class="nf" data-unit="mm"><input type="number" min="0" step="0.1" data-bind="texture.borders.lid.top" aria-label="Lid top-edge border"></span></td>
+                <td><span class="nf" data-unit="mm"><input type="number" min="0" step="0.1" data-bind="texture.borders.lid.face" aria-label="Lid top border"></span></td></tr>
+            </tbody>
+          </table>
+          <p class="hint">Plain band left untextured at each edge, as the case sits closed: the base's bottom edge
+            and the parting line, the lid's parting line and its top edge, and round each face. Drag a field's edge
+            to scrub it. <b>All borders</b> sets all of them at once.</p>
           <h3>Each side</h3>
           <table class="texgrid">
             <thead><tr><th></th><th>Base</th><th data-hide="build:tray">Lid</th></tr></thead>

@@ -527,6 +527,15 @@ window.CS = window.CS || {};
     return preview ? CS.clamp(scale / 9 * q, 0.3, 0.8) : CS.clamp(scale / 30 * q, 0.06, 0.2);
   };
 
+  /* Plain border of one edge of a half's texture: 'bottom' / 'top' of the
+     wall band (as the case sits closed) or round the 'face'. Falls back to
+     the single border older designs had. */
+  CS.texBorder = function (T, half, edge) {
+    var b = T.borders && T.borders[half] && T.borders[half][edge];
+    if (b == null || !isFinite(b)) b = T.border == null ? 1 : T.border;
+    return CS.clamp(b, 0, 20);
+  };
+
   function texturePlan(D, state, half) {
     var T = state.texture;
     if (!T || !T.enabled) return null;
@@ -553,10 +562,10 @@ window.CS = window.CS || {};
     ws.zHi = isBase ? D.zP : D.zT - D.et;
     ws.taper = function (z) { return (isBase ? D.zP - z : z - D.zP) * D.tanO; };
     /* Textured band with a crisp edge: plain up to zA, a 0.05 mm step out to
-       full depth, full depth to zB, and a step back. */
-    var border = CS.clamp(T.border == null ? 1 : T.border, 0, 20);
-    ws.border = border;
-    ws.zA = ws.zLo + border; ws.zB = ws.zHi - border;
+       full depth, full depth to zB, and a step back. Each edge has its own
+       plain border (bottom and top as the case sits closed). */
+    ws.zA = ws.zLo + CS.texBorder(T, half, 'bottom');
+    ws.zB = ws.zHi - CS.texBorder(T, half, 'top');
     /* Beside the lip the lid wall is only its outer half. If the texture is
        deeper than that can take, start the lid's band above the groove. */
     var deepest = Math.max.apply(null, ['front', 'back', 'left', 'right'].map(function (k) {
@@ -789,7 +798,7 @@ window.CS = window.CS || {};
   var atlasCache = {};
   CS.textureAtlas = function (D, state, half, pats, res) {
     var T = state.texture;
-    var key = JSON.stringify([half, pats, T.pattern, T.scale, T.angle, T.depth, T.raise, T.border, D.W, D.L, D.R,
+    var key = JSON.stringify([half, pats, T.pattern, T.scale, T.angle, T.depth, T.raise, T.border, T.borders, D.W, D.L, D.R,
       D.zP, D.zT, D.eb, D.et, D.tanO, D.T0, D.lipOn, D.lipH, D.lipC, D.lipT, D.plainZones, D.top, D.bottom,
       D.side, D.claspSide, D.tray, (CS.assets.texture && CS.assets.texture._rev) || 0]);
     if (atlasCache[half] && atlasCache[half].key === key) return atlasCache[half].atlas;
@@ -818,7 +827,7 @@ window.CS = window.CS || {};
     if (hasFace) {
       var depth = CS.clamp(T.depth, 0.05, 3), raise = texRaise(D, state).face, isBase = half === 'base';
       var inCap = Math.max(0.05, (isBase ? D.bottom : D.top) - 0.8);
-      var f = CS.texSampler(pats.face, T.scale, T.angle), border = CS.clamp(T.border == null ? 1 : T.border, 0, 20);
+      var f = CS.texSampler(pats.face, T.scale, T.angle), border = CS.texBorder(T, half, 'face');
       var hx = fo.w / 2 - border, hy = fo.h / 2 - border, rr = Math.max(0, Math.min(fo.r, fo.w / 2, fo.h / 2) - border);
       for (var jf = 0; jf < faceRows; jf++) {
         var y = -fo.h / 2 + (jf - 1) / k;
@@ -931,7 +940,7 @@ window.CS = window.CS || {};
     var z0 = isBase ? 0 : D.zT, out = isBase ? -1 : 1;
     var inCap = Math.max(0.05, (isBase ? D.bottom : D.top) - 0.8);
     var below = Math.min(inCap, Math.max(0, depth - raise)) + 0.2;        // floor of the cut, under the surface
-    var border = CS.clamp(T.border == null ? 1 : T.border, 0, 20);
+    var border = CS.texBorder(T, half, 'face');
     var bw = fo.w - 2 * border, bh = fo.h - 2 * border;
     if (bw < 1 || bh < 1) return null;
     var hx = fo.w / 2, hy = fo.h / 2, r = Math.min(fo.r, hx, hy);

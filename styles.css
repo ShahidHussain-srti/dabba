@@ -359,3 +359,7 @@ button.danger:disabled{color:var(--bad)}
 
 .legal{margin:18px 14px 0; font-size:10.5px; line-height:1.5; color:var(--ink3)}
 .legal a{color:var(--ink2)}
+
+.bordergrid td{padding:3px 2px}
+.bordergrid .nf input[type=number]{padding:3px 22px 3px 4px; font-size:11.5px}
+.bordergrid thead th{font-size:10.5px}
