@@ -328,6 +328,30 @@ console.log('pocket shape per compartment');
   check('a new compartment copies the pocket shape it was added from', added.pocket.taper === 8 && added.pocket !== secs[0].pocket);
 }
 
+console.log('lid mirrors the base');
+{
+  const s = CS.defaults();
+  s.lidInner.mode = 'mirror'; s.lidInner.depth = 'mirror';
+  const secs = CS.layout.sections(s.layout);
+  secs[0].pocket.floor = 2; secs[0].pocket.rim = 1; secs[0].pocket.taper = 3; secs[1].pocket.corner = 4;
+  const m = CS.buildModel(s, { decor: false }), D = m.D || CS.describe(s);
+  const base = toManifold(wasm, m.parts.find(p => p.key === 'base')), lid = toManifold(wasm, m.parts.find(p => p.key === 'lid'));
+  const gap = s.lidInner.gap, zm = D.zP + gap / 2;
+  // Inside the interior, keeping clear of the lip and the hinge sweep.
+  const inset = 3, W = D.IW - 2 * inset, L = D.IL - 2 * inset;
+  const slab = (body, z) => { const b = wasm.Manifold.cube([W, L, 0.1], true).translate([0, 0, z]); const v = body.intersect(b).volume(); b.delete(); return v; };
+  let worst = 0, rows = [];
+  for (const k of [gap / 2 + 0.3, gap / 2 + 1, 3, 6, 9]) {
+    if (zm + k > D.zP + D.Ht - 0.2 || zm - k < D.bottom + 0.2) continue;
+    const a = slab(base, zm - k), b = slab(lid, zm + k);
+    worst = Math.max(worst, Math.abs(a - b) / Math.max(a, 1e-6));
+    rows.push(k.toFixed(1) + ':' + a.toFixed(1) + '/' + b.toFixed(1));
+  }
+  check('each lid slice matches the base slice it mirrors', rows.length >= 3 && worst < 0.02, rows.join(' '));
+  base.delete(); lid.delete();
+  check('the mirrored lid is a valid solid', m.parts.every(p => { const t = toManifold(wasm, p); const ok = t.status() === 'NoError'; t.delete(); return ok; }));
+}
+
 console.log('export');
 {
   const s = CS.defaults();

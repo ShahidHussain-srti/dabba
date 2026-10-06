@@ -85,7 +85,7 @@ window.CS = window.CS || {};
       pocket: { corner: 1.5, floor: 0.8, rim: 0.6, taper: 0 },
       lip: { enabled: true, height: 2.4, clearance: 0.2,
              sides: { back: true, front: true, left: true, right: true } },
-      lidInner: { mode: 'open', gap: 0.8, depth: 'full' },
+      lidInner: { mode: 'open', gap: 0.8, depth: 'mirror' },
       hinge: { side: 'back', count: 2, knuckles: 3, length: 24, diameter: 6, pin: 1.9,
                gap: 0.4, clearance: 0.4, inset: 10 },
       clasp: { type: 'snap', count: 1, width: 14, thickness: 1.8, reach: 6, catch: 0.9,

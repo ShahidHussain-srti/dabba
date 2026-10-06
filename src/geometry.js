@@ -1018,12 +1018,25 @@ window.CS = window.CS || {};
      line, with a pocket over every compartment. Near the hinge the lid swings
      sideways across the lip as it opens, so the walls also keep back from the
      lip by that sweep: about lipH² / 2r for a lip at distance r from the axis. */
-  function mirrorLid(S, D, state, lid, lidShell) {
+  /* baseCuts: the base's pocket solids, for an exact mirror. */
+  function mirrorLid(S, D, state, lid, lidShell, baseCuts) {
     var LI = state.lidInner;
     var gap = WB.clamp(LI.gap, 0.2, Math.max(0.2, D.Ht - 0.6));
     var r = D.hinge.rk + D.hinge.c + D.T0;
     var keep = D.lipOn ? D.lipC + D.lipH * D.lipH / (2 * r) : 0.1;
     var filler = inter(S, prism(S, [interiorRing(D, keep)], D.zP + gap, D.zP + D.Ht + 0.05), lidShell);
+    /* Mirror the base: every base pocket reflected about the middle of the gap,
+       so the base rim lands on the lid's lower face and depth, floor rounding,
+       rim round-over, taper and the shapes inside all match, face to face. A
+       pocket deeper than the lid simply opens up to the lid top. */
+    if (LI.depth === 'mirror' && baseCuts) {
+      var zm = D.zP + gap / 2;
+      var mirrored = baseCuts.filter(Boolean).map(function (c) {
+        return S.k(S.k(c.mirror([0, 0, 1])).translate([0, 0, 2 * zm]));
+      });
+      D.lidGap = gap;
+      return mirrored.length ? union(S, [lid, sub(S, filler, union(S, mirrored))]) : union(S, [lid, filler]);
+    }
     var pockets = D.rects.map(function (rc) {
       var s = rc.node, gTop = s._depth * s._tanP;
       var dl = D.Ht + 1;
@@ -1301,7 +1314,7 @@ window.CS = window.CS || {};
                              D.zP - 1, D.zP + D.lipH + D.lipC);
           lid = sub(S, lid, sub(S, groove, lipCuts(S, D, 0)));
         }
-        if (state.lidInner && state.lidInner.mode === 'mirror') lid = mirrorLid(S, D, state, lid, lidShell);
+        if (state.lidInner && state.lidInner.mode === 'mirror') lid = mirrorLid(S, D, state, lid, lidShell, cuts);
       }
 
       /* Into the canonical frame for the hinge and clasps, then back. */
