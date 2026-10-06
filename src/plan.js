@@ -118,7 +118,7 @@ window.CS = window.CS || {};
       ctx.strokeRect(sx(t, k.x0) + 0.5, sy(t, k.y1) + 0.5, (k.x1 - k.x0) * t.s - 1, (k.y1 - k.y0) * t.s - 1);
     });
     D.planClasps.forEach(function (c) {
-      if (c.type !== 'snap' && c.type !== 'hook' && c.type !== 'swing') return;
+      if (c.type !== 'snap' && c.type !== 'hook' && c.type !== 'swing' && c.type !== 'press') return;
       ctx.fillStyle = lidC;
       ctx.strokeStyle = 'rgba(0,0,0,0.35)';
       ctx.fillRect(sx(t, c.x0), sy(t, c.y1), (c.x1 - c.x0) * t.s, (c.y1 - c.y0) * t.s);
@@ -170,7 +170,7 @@ window.CS = window.CS || {};
     // Clasp marks that live inside the wall.
     D.planClasps.forEach(function (c) {
       if (c.type === 'hook' || c.type === 'swing') return;
-      if (c.type === 'snap') {
+      if (c.type === 'snap' || c.type === 'press') {
         ctx.fillStyle = shade(baseC, 0.5);
         var depth = Math.min(1.2, D.T0 * 0.5);
         var inward = rotIn(D, c, depth);

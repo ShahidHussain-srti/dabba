@@ -307,6 +307,52 @@ window.CS = window.CS || {};
         warn.push({ level: 'bad', msg: 'The swing hook\'s pivot does not fit on the lid. Use a smaller hub or a taller lid.' });
       }
     }
+    /* Press latch: a stiff tab hangs outside the lid, joined to it only by a
+       thin horizontal web near the top. Pressing the tab above the web rocks
+       it, swinging its hook out of a slot in the base. The web is the spring
+       and the hinge; it is thin in z, so it bends within the print layers,
+       not across them (the lid prints upside down, the web flat). The web
+       sits high so the lever below it is long and the rock is small, and the
+       press side stands off the wall enough to make that rock. */
+    var pr = { t: WB.clamp(C.thickness, 0.8, 5), e: WB.clamp(C.catch, 0.3, 3), cl: WB.clamp(C.clearance, 0.05, 0.8) };
+    pr.reach = WB.clamp(C.reach, 2, Math.max(2, D.zP - D.eb - 1));
+    pr.zb = D.zP - pr.reach;
+    pr.gapAt = pr.reach * D.tanO;
+    pr.zTop = D.zT;                                         // flush with the lid top, so it starts on the bed
+    pr.tw = Math.max(2 * D.lh, D.lh * Math.round(0.8 / D.lh));
+    pr.nf = Math.max(0.8, pr.e);
+    pr.pressH = WB.clamp((pr.zTop - pr.zb) * 0.36, 4, 12);
+    pr.zW = pr.zTop - pr.pressH;                            // top of the web
+    /* The tab is cranked: the press side stands off the wall by gP, and a 45°
+       step below the web brings the hooked side back to a clearance from it,
+       like the snap's tab. So the hook's reach stays small and fixed, and the
+       step prints without support on the upside-down lid. */
+    pr.eP = pr.e + pr.cl + pr.gapAt;
+    pr.zTopNub = pr.zb + pr.eP + pr.nf;
+    // Rocking about the web has to carry the hook's catching edge out of the slot.
+    pr.theta = (pr.e + pr.cl + pr.gapAt + 0.2) / Math.max(1, pr.zW - pr.tw / 2 - pr.zTopNub);
+    // Room for the press side to rock that far, and the web's bend at 2.5% or less.
+    pr.gP = Math.max(1.8, pr.theta * pr.pressH + 0.4, (pr.tw / 2) * pr.theta / 0.025);
+    pr.zCtop = pr.zW - pr.tw - 1;                           // the step starts a millimetre under the web
+    pr.zCbot = pr.zCtop - (pr.gP - pr.cl);
+    pr.strain = (pr.tw / 2) * pr.theta / pr.gP;
+    D.press = pr;
+    if (C.type === 'press' && cn) {
+      if (pr.zW - pr.tw < D.zP + 0.6 || pr.zCbot - pr.t < pr.zTopNub + 0.3) {
+        warn.push({ level: 'bad', msg: 'There isn\'t room for a press latch here: the lid is too shallow for its web and step, or the reach too long. ' +
+          'Use a taller lid share, less reach, or another clasp.' });
+      }
+      if (pr.zTopNub + pr.cl > D.zP - 0.8) {
+        warn.push({ level: 'warn', msg: 'The press latch reaches only a little below the rim for its hook. More reach makes a sturdier catch.' });
+      }
+      if (pr.strain > 0.03) {
+        warn.push({ level: 'warn', msg: 'The press latch\'s web bends ' + (pr.strain * 100).toFixed(1) + '% to open, more than PLA likes to repeat. ' +
+          'More reach, a smaller hook depth or a taller lid lowers it.' });
+      }
+      if (pr.gapAt + pr.e + pr.cl > D.T0 - 0.8) {
+        warn.push({ level: 'bad', msg: 'The press latch slots are nearly through the ' + D.T0.toFixed(1) + ' mm wall. Use a smaller hook depth or thicker walls.' });
+      }
+    }
     if (C.type === 'hook' && cn) {
       if (D.latch.zB - rkL < D.eb + 0.3) {
         warn.push({ level: 'bad', msg: 'The latch catch hangs below the base. Reduce the latch drop or lug diameter, or make the base taller.' });
@@ -339,6 +385,8 @@ window.CS = window.CS || {};
         var reach = WB.clamp(C.reach, 2, Math.max(2, D.zP - D.eb - 1));
         var attach = WB.clamp(D.zT - D.zP - D.et - t - cl2 - 0.6, 1.2, 10);
         zone(D.claspSide, -Lc / 2, x0, x1, D.zP - reach - 1, D.zP + attach + t + cl2 + 1);
+      } else if (C.type === 'press') {
+        zone(D.claspSide, -Lc / 2, x0, x1, D.press.zb - D.press.cl - 1, D.zT + 1);
       } else if (C.type === 'hook') {
         zone(D.claspSide, -Lc / 2, x0, x1, D.latch.chinBase - 0.5, D.latch.chinLid + 0.5);
       } else if (C.type === 'swing') {
@@ -360,8 +408,9 @@ window.CS = window.CS || {};
                y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]) };
     });
     D.planClasps = D.clasps.map(function (q) {
-      var outside = C.type === 'snap' || C.type === 'hook' || C.type === 'swing';
+      var outside = C.type === 'snap' || C.type === 'hook' || C.type === 'swing' || C.type === 'press';
       var depth = C.type === 'snap' ? C.thickness + C.clearance
+                : C.type === 'press' ? D.press.gP + D.press.t + 0.5
                 : C.type === 'hook' ? 2 * D.latch.rk + D.latch.cl
                 : C.type === 'swing' ? D.swing.out : 0;
       var a = back(q.xc - q.w / 2, -Lc / 2 - depth), b = back(q.xc + q.w / 2, -Lc / 2 + (outside ? 0 : D.T0));
@@ -502,30 +551,21 @@ window.CS = window.CS || {};
      sampled evenly, and each vertex is pushed in (or out) by the pattern.
      Walls are mapped by (distance round the perimeter, z), faces by (x, y).
 
-     Two engines (state.texture.engine):
-       fine     The export samples far finer than the eye needs, then Manifold
-                simplifies the shell to a 0.01 mm tolerance, so triangles stay
-                dense only where the surface actually bends. The preview builds a light mesh for shape
-                and carries per-vertex atlas coordinates; the viewer shades it
-                per pixel from a height atlas of the very same function.
-       classic  The previous behaviour: one grid density for both, every
-                sample averaged over its cell. Kept as a way back. */
+     The export samples far finer than the eye needs, then Manifold simplifies
+     the shell to a 0.01 mm tolerance, so triangles stay dense only where the
+     surface actually bends. The preview builds
+     a light mesh for shape and carries per-vertex atlas coordinates; the
+     viewer shades it per pixel from a height atlas of the very same function. */
   var EPS_R = 0.05;
   var NP = 12;   // per-vertex: x y z | atlas u v | base normal xyz | tangent xyz | kind
 
-  CS.texEngine = function (state) { return (state.texture && state.texture.engine) === 'classic' ? 'classic' : 'fine'; };
-
-  /* Pattern size → grid spacing. Classic: ~14 samples per repeat, 1.5× coarser
-     in the preview. Fine: the export oversamples (~30 per repeat, before
-     simplification); the preview only needs the shape, the detail is shaded. */
+  /* Pattern size → grid spacing. The export oversamples (~30 per repeat,
+     before simplification); the preview only needs the shape, as the detail
+     is shaded. */
   CS.texResFor = function (state, preview) {
     var T = state.texture || {};
     var q = { draft: 1.6, normal: 1, fine: 0.8, ultra: 0.6 }[state.quality] || 1;
     var scale = Math.max(0.5, T.scale || 4);
-    if (CS.texEngine(state) === 'classic') {
-      var r = WB.clamp(scale / 14, 0.12, 0.45) * q;
-      return preview ? WB.clamp(r * 1.5, 0.25, 0.7) : WB.clamp(r, 0.1, 0.7);
-    }
     return preview ? WB.clamp(scale / 9 * q, 0.3, 0.8) : WB.clamp(scale / 30 * q, 0.06, 0.2);
   };
 
@@ -663,9 +703,8 @@ window.CS = window.CS || {};
   function texturedShell(S, D, state, half, pats, res, props) {
     var style = state.outer.edgeStyle;
     var ws = wallSetup(D, state, half, pats, res), isBase = ws.isBase;
-    var fine = CS.texEngine(state) === 'fine' && !props;
-    var sample = fine ? function (f, u, v) { return lightFilter(f, u, v, res); }
-                      : function (f, u, v) { return filtered(f, u, v, res); };
+    var sample = props ? function (f, u, v) { return filtered(f, u, v, res); }
+                       : function (f, u, v) { return lightFilter(f, u, v, res); };
 
     /* Rows up the side: [z, inset, plain]. Fillet rows follow the edge
        profile; the band gets evenly spaced rows `res` apart. */
@@ -775,21 +814,21 @@ window.CS = window.CS || {};
     else tris.push(a, b, d, b, c, d);
   }
 
-  /* Classic: the pattern averaged over the whole grid cell (3 × 3 taps), so
-     a crisp edge becomes a ramp one cell wide instead of a staircase. */
+  /* Preview mesh: the pattern averaged over the whole (coarse) grid cell,
+     3 × 3 taps, so the shape reads smoothly under the per-pixel shading. */
   function filtered(f, u, v, res) {
     var h = res / 3, sum = 0;
     for (var i = -1; i <= 1; i++) for (var j = -1; j <= 1; j++) sum += f(u + i * h, v + j * h);
     return sum / 9;
   }
-  /* Fine: the grid is already far finer than any feature, so a light four-tap
-     average is enough to keep it from aliasing. */
+  /* Export: the grid is already far finer than any feature, so a light
+     four-tap average is enough to keep it from aliasing. */
   function lightFilter(f, u, v, res) {
     var h = res * 0.25;
     return (f(u - h, v - h) + f(u + h, v - h) + f(u - h, v + h) + f(u + h, v + h)) / 4;
   }
 
-  /* ── height atlas (fine engine preview) ───────────────────────────── */
+  /* ── height atlas (preview shading) ──────────────────────────────── */
   /* An image of how far the surface moves in, for one half: the textured
      wall band unrolled (u round the perimeter × z) on top, the textured face
      (x × y) below, at k texels per mm. The viewer reads it per pixel to shade
@@ -853,11 +892,11 @@ window.CS = window.CS || {};
   };
 
   /* The outer shell of a half: textured when asked, else the plain hull.
-     `atlas` (preview, fine engine) gets the half's height atlas attached. */
+     `atlas` (preview) gets the half's height atlas attached. */
   function shellFor(S, D, state, half, style, notes, preview, atlasOut) {
     var pats = texturePlan(D, state, half);
     if (!pats) return half === 'base' ? baseOuter(S, D, style) : lidOuter(S, D, style);
-    var engine = CS.texEngine(state), res = CS.texResFor(state, preview);
+    var res = CS.texResFor(state, preview);
     if (notes && !notes._tex) {
       notes._tex = true;
       var depth = WB.clamp(state.texture.depth, 0.05, 3), rz = texRaise(D, state);
@@ -872,15 +911,15 @@ window.CS = window.CS || {};
       }
       if ((state.texture.raise || 0) > 0 && !D.tray) {
         notes.push({ level: 'ok', msg: 'Raised texture stays cut in along the ' + D.side + ' edge' +
-          (D.clasps.length && /^(snap|hook|swing)$/.test(state.clasp.type) ? ' and the ' + D.claspSide + ' edge' : '') +
-          ', so it cannot rub the hinge' + (D.clasps.length && /^(snap|hook|swing)$/.test(state.clasp.type) ? ' or the clasps' : '') + '.' });
+          (D.clasps.length && /^(snap|hook|swing|press)$/.test(state.clasp.type) ? ' and the ' + D.claspSide + ' edge' : '') +
+          ', so it cannot rub the hinge' + (D.clasps.length && /^(snap|hook|swing|press)$/.test(state.clasp.type) ? ' or the clasps' : '') + '.' });
       }
       if (D.lipOn && cutIn > D.lipT - 0.6) {
         notes.push({ level: 'ok', msg: 'The texture is deeper than the lid wall beside the lip, so on the lid it starts above the lip groove.' });
       }
     }
 
-    var shaded = preview && engine === 'fine';
+    var shaded = !!preview;
     var atlas = shaded ? CS.textureAtlas(D, state, half, pats, res) : null;
     if (atlas && atlasOut) atlasOut[half] = atlas;
     var props = atlas ? { atlas: atlas } : null;
@@ -889,7 +928,7 @@ window.CS = window.CS || {};
     var shell = walls ? texturedShell(S, D, state, half, pats, res, props)
                       : (half === 'base' ? baseOuter(S, D, style) : lidOuter(S, D, style));
     // Fine export: oversampled, so thin it out wherever the surface is flat.
-    if (walls && engine === 'fine' && !preview) shell = S.k(shell.simplify(0.01));
+    if (walls && !preview) shell = S.k(shell.simplify(0.01));
     if (!pats.face) return shell;
     var fr = faceRelief(S, D, state, half, pats.face, res, props);
     return fr ? union(S, [sub(S, shell, fr.cut), fr.add]) : shell;
@@ -901,7 +940,7 @@ window.CS = window.CS || {};
      there, stay cut in: anything proud would rub the hinge or the clasp. */
   function texRaise(D, state) {
     var T = state.texture, depth = WB.clamp(T.depth, 0.05, 3), raise = WB.clamp(T.raise || 0, -3, 3), out = {};
-    var hangs = !D.tray && D.clasps.length && /^(snap|hook|swing)$/.test(state.clasp.type);
+    var hangs = !D.tray && D.clasps.length && /^(snap|hook|swing|press)$/.test(state.clasp.type);
     // Negative sinks the whole pattern into the wall, but never so far that its
     // deepest point comes within 0.8 mm of the inside.
     var wallFloor = depth - Math.max(0.05, D.T0 - 0.8);
@@ -934,8 +973,7 @@ window.CS = window.CS || {};
      Returns { cut, add }, or null when there is no room. */
   function faceRelief(S, D, state, half, pattern, res, props) {
     var T = state.texture, depth = WB.clamp(T.depth, 0.05, 3), isBase = half === 'base';
-    var fine = CS.texEngine(state) === 'fine';
-    var sample = fine && !props ? lightFilter : filtered;
+    var sample = props ? filtered : lightFilter;
     var atlas = props && props.atlas, np = props ? NP : 3;
     var raise = texRaise(D, state).face;
     var fo = CS.faceOutline(D, half), f = CS.texSampler(pattern, T.scale, T.angle);
@@ -988,7 +1026,7 @@ window.CS = window.CS || {};
     var mesh = new WASM.Mesh({ numProp: np, vertProperties: new Float32Array(verts), triVerts: new Uint32Array(tris) });
     var block = S.k(new WASM.Manifold(mesh));
     if (block.status() !== 'NoError' || block.volume() <= 0) throw new Error('Face texture produced an invalid surface (' + block.status() + ').');
-    if (fine && !props) block = S.k(block.simplify(0.01));
+    if (!props) block = S.k(block.simplify(0.01));
     var lo = z0 - out * below, hi = z0 + out * (raise + depth + 2);
     var outline = [rrect(bw, bh, Math.max(0, r - border), 0, 0, D.seg)];
     // The block reaches 0.01 mm past the cut, so it overlaps the face round
@@ -1173,6 +1211,32 @@ window.CS = window.CS || {};
           ]));
         }
         cutB.push(box(S, x0 - cl, yF - 1, zb - cl, x1 + cl, yF + gapAt + e + cl, zTopNub + cl));
+      });
+    } else if (C.type === 'press') {
+      var P2 = D.press, ct = P2.cl;
+      var yUp = yF - P2.gP, yLo = yF - ct;                  // inner faces of the press side and the hooked side
+      var ovW = Math.max(0.4, D.T0 / 2 - D.lipC / 2 - 0.05) + (P2.zW - D.zP) * D.tanO;
+      D.clasps.forEach(function (q) {
+        var x0 = q.xc - q.w / 2, x1 = q.xc + q.w / 2, t2 = P2.t;
+        // Press side: from the lid top (on the bed when printed) down to the step.
+        addL.push(box(S, x0, yUp - t2, P2.zCtop - t2, x1, yUp, P2.zTop));
+        // The 45° step in to the hooked side.
+        addL.push(hullOf(S, [box(S, x0, yUp - t2, P2.zCtop - t2, x1, yUp, P2.zCtop),
+                             box(S, x0, yLo - t2, P2.zCbot - t2, x1, yLo, P2.zCbot)]));
+        // Hooked side, down past the rim.
+        addL.push(box(S, x0, yLo - t2, P2.zb, x1, yLo, P2.zCbot));
+        // The web: the only joint, thin in z.
+        addL.push(box(S, x0, yUp - 0.01, P2.zW - P2.tw, x1, yF + ovW, P2.zW));
+        // Hook: 45° lead-in underneath, flat catch on top, as on the snap.
+        addL.push(hullOf(S, [
+          box(S, x0, yLo - 0.4, P2.zb, x1, yLo, P2.zTopNub),
+          box(S, x0, yLo - 0.4, P2.zb + P2.eP, x1, yLo + P2.eP, P2.zTopNub)
+        ]));
+        // Two ribs mark where to press.
+        [P2.zTop - 1.4, P2.zTop - 3.2].forEach(function (z) {
+          if (z - 0.6 > P2.zW) addL.push(cylX(S, x0 + 0.8, x1 - 0.8, yUp - t2, z, 0.55, 12));
+        });
+        cutB.push(box(S, x0 - ct, yF - 1, P2.zb - ct, x1 + ct, yF + P2.gapAt + P2.e + ct, P2.zTopNub + ct));
       });
     } else if (C.type === 'magnet') {
       var rm = C.magnetD / 2 + cl, mh = Math.max(0.5, C.magnetH);

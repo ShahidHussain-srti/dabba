@@ -283,15 +283,8 @@
               <tr><th>Face</th><td><select class="texsel" data-bind="texture.sides.base.face"></select></td><td data-hide="build:tray"><select class="texsel" data-bind="texture.sides.lid.face"></select></td></tr>
             </tbody>
           </table>
-          <div class="row">
-            <span class="lbl">Texture engine</span>
-            <div class="seg small full" role="group" aria-label="Texture engine" data-bind="texture.engine">
-              <button value="fine" title="Per-pixel preview; export oversampled then simplified">Fine</button>
-              <button value="classic" title="The previous method: one mesh density for preview and export">Classic</button>
-            </div>
-          </div>
-          <p class="hint" data-show="texture.engine:fine">Fine shades the preview per pixel from the exact texture, and
-            exports a much finer surface simplified to within 0.01 mm. Exports take a few seconds longer.</p>
+          <p class="hint">The preview shades the texture per pixel; the export samples a much finer surface and
+            simplifies it to within 0.01 mm, so exports take a few seconds longer.</p>
           <p class="hint">Face is the base underside and the lid top. Texture stops with a crisp edge, a plain border
             short of rounded edges, the parting line and the face outline, so the halves still meet cleanly;
             decoration is cut through it. It makes much bigger
@@ -388,6 +381,7 @@
             <button value="snap" title="Flexible tab on the lid">Snap</button>
             <button value="hook" title="Separate hook on a pin">Hook</button>
             <button value="swing" title="Jewellery-box swing hook">Swing</button>
+            <button value="press" title="Tab you press at the top to release">Press</button>
             <button value="magnet">Magnet</button>
             <button value="bump" title="Ridges on the lip">Bump</button>
           </div>
@@ -399,6 +393,9 @@
         <p class="hint" data-show="clasp.type:swing">A jewellery-box swing hook: a flat hook turns on a filament pin
           set into a boss on the lid, and its curved tip threads through an eye on the base. Turn the knob to open.
           The hook prints flat as its own piece.</p>
+        <p class="hint" data-show="clasp.type:press">A stiff tab hangs from the lid on a thin web near its top. Press the
+          tab above the web and it rocks, lifting its hook out of the slot in the base; close the lid and it clicks back in.
+          The web is both hinge and spring, and it prints flat, so it bends along its layers rather than across them.</p>
         <p class="hint" data-show="clasp.type:magnet">Pockets for round magnets in the base rim and lid, meeting face
           to face. Glue them in, minding the polarity.</p>
         <p class="hint" data-show="clasp.type:bump">Small ridges on the alignment lip click into matching dimples in
@@ -406,10 +403,12 @@
         <div data-hide="clasp.type:none">
           <div class="row num" data-num="clasp.count" data-min="1" data-max="6" data-step="1" data-unit="">Count</div>
           <div class="row num" data-num="clasp.width" data-min="4" data-max="60" data-step="0.5" data-unit="mm">Width</div>
-          <div data-show="clasp.type:snap">
+          <div data-show="clasp.type:snap|press">
             <div class="row num" data-num="clasp.thickness" data-min="0.8" data-max="4" data-step="0.1" data-unit="mm">Tab thickness</div>
             <div class="row num" data-num="clasp.reach" data-min="2" data-max="30" data-step="0.5" data-unit="mm">Reach below the rim</div>
             <div class="row num" data-num="clasp.catch" data-min="0.3" data-max="3" data-step="0.05" data-unit="mm">Hook depth</div>
+          </div>
+          <div data-show="clasp.type:snap">
             <div class="row inlinerow"><label class="chk"><input type="checkbox" data-bind="clasp.grip"> Grip lip to flick it open</label></div>
           </div>
           <div data-show="clasp.type:hook|swing">

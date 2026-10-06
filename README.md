@@ -59,8 +59,11 @@ locked until you turn Fill off.
   rounding and shapes, so things are held from above when it's shut.
 - A filament-pin hinge on any edge: count, knuckles, length, pin size and clearances are
   all adjustable.
-- Clasps: snap hooks, magnets, snap bumps, a hook latch on its own pin, or a swing hook
-  like the ones on old jewellery boxes. The two hook types print as a separate small piece.
+- Clasps: snap hooks, magnets, snap bumps, a hook latch on its own pin, a swing hook like
+  the ones on old jewellery boxes, or a press latch: a stiff tab hung from the lid on a thin
+  web, which you press at the top to lift its hook out of the base. The web is both hinge
+  and spring, and it prints flat so it bends along its layers rather than across them. The
+  hook latch and swing hook print as a separate small piece.
 
 ### Texture and decoration
 

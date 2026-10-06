@@ -59,6 +59,13 @@ function variants() {
   const w2 = CS.defaults();
   w2.clasp.type = 'swing'; w2.clasp.latchDrop = 3; w2.clasp.latchD = 8; w2.lip.height = 4; w2.split = 0.55;
   out.push(['big swing hook, tall lip', w2]);
+  for (const side of ['back', 'left']) {
+    const pr = CS.defaults();
+    pr.hinge.side = side; pr.clasp.type = 'press'; pr.clasp.count = side === 'back' ? 2 : 1;
+    out.push(['press latches, hinge ' + side, pr]);
+  }
+  const pr2 = CS.defaults(); pr2.clasp.type = 'press'; pr2.clasp.reach = 9; pr2.lip.enabled = false; pr2.lidInner.mode = 'walls';
+  out.push(['long-reach press latch, no lip, walls-only lid', pr2]);
 
   const m2 = CS.defaults();
   m2.lidInner.mode = 'mirror'; m2.lidInner.depth = 'fit'; m2.lip.sides.front = false; m2.hinge.side = 'left';
@@ -159,6 +166,20 @@ for (const [name, state] of variants()) {
      flexed outward. Swing-test the hinge with the hooks off, and separately
      check the only thing in the way at the start is the hook itself. */
   let swing = model;
+  if (state.clasp.type === 'press') {
+    const free = JSON.parse(JSON.stringify(state));
+    free.clasp.type = 'none';
+    swing = CS.buildModel(free, { decor: false });
+    const P = model.D.press, c = state.clasp, hook = model.D.clasps.length * c.width * (P.eP + 0.5) * (P.eP + P.nf + 1.5);
+    const v5 = clash(model, 'open', 5);
+    check('only the press hooks resist opening', v5 < hook, v5.toFixed(2) + ' mm³ vs hook ' + hook.toFixed(2));
+    // Rocking the tab by its release angle about the web swings the hook's tip
+    // clear of the slot, and the press side has room to move that far.
+    const tipBelow = P.zW - P.tw / 2 - P.zTopNub, out = P.theta * tipBelow;
+    check('pressing frees the hook before the tab meets the wall', out >= P.e + P.gapAt + P.cl && P.theta * P.pressH <= P.gP - 0.3,
+          'hook moves ' + out.toFixed(2) + ' mm for ' + (P.e + P.gapAt + P.cl).toFixed(2) + ', press travel ' + (P.theta * P.pressH).toFixed(2) + ' of ' + P.gP.toFixed(2));
+    check('the press latch web bends within what PLA repeats', P.strain <= 0.03, (P.strain * 100).toFixed(2) + '%');
+  }
   if (state.clasp.type === 'snap') {
     const free = JSON.parse(JSON.stringify(state));
     free.clasp.type = 'none';
