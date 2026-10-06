@@ -431,11 +431,11 @@ window.CS = window.CS || {};
 
   /* ── pockets ────────────────────────────────────────────────────── */
   function pocket(S, D, P, r, zTop, clip) {
-    var s = r.node, d = s._depth, zf = D.zP - d;
-    var round = s.shape === 'round';
+    var s = r.node, d = r.depth != null ? r.depth : s._depth, zf = D.zP - d;
+    var round = (r.shape || s.shape) === 'round';
     var rf = Math.max(0, Math.min(P.floor, d * 0.45, Math.min(r.w, r.l) / 2 - 0.2));
     var rr = Math.max(0, Math.min(P.rim, D.inner / 2 - 0.3, d * 0.35, d - rf - 0.2));
-    var rc = Math.min(P.corner, Math.min(r.w, r.l) / 2);
+    var rc = r.corner != null ? Math.min(r.corner, Math.min(r.w, r.l) / 2) : Math.min(P.corner, Math.min(r.w, r.l) / 2);
     var seg = D.seg;
 
     var ring = function (z, off) {          // off > 0 grows the outline
@@ -467,7 +467,7 @@ window.CS = window.CS || {};
     }
     parts.push(loft(S, [ring(D.zP, rr), ring(zTop, rr)], true));
     // The rim round-over and taper may not eat into the outer wall or lip.
-    return inter(S, union(S, parts), clip);
+    return clip ? inter(S, union(S, parts), clip) : union(S, parts);
   }
 
   /* ── Gridfinity feet ─────────────────────────────────────────────── */
@@ -1043,6 +1043,41 @@ window.CS = window.CS || {};
     return union(S, [lid, sub(S, filler, union(S, pockets))]);
   }
 
+  /* ── shaped pockets ─────────────────────────────────────────────── */
+  /* A compartment's cut: the plain box / oval as before (it can grow to fill
+     its slot), otherwise every shape of what it holds, each at its own depth,
+     placed round the compartment's centre. Boxes, ovals and capsules get the
+     usual corner, floor and rim rounding; a lying cylinder is a U-shaped
+     trough, round at the bottom with straight sides to the rim, its axis set
+     so the object rests on the compartment floor (or on the largest section's
+     axis, for a stepped cylinder). */
+  function sectionCut(S, D, P, r, zTop, clip) {
+    var sh = r.node._shape;
+    if (!sh || sh.fill) return pocket(S, D, P, r, zTop, clip);
+    var seg = D.seg, out = [];
+    sh.prims.forEach(function (q) {
+      var depth = q._depth != null ? q._depth : r.node._depth, solid = null;
+      if (q.type === 'cyl') {
+        var R = q.l / 2, zf = D.zP - r.node._depth, axis = zf + (q.axis != null ? q.axis : R);
+        if (q._depth != null && q.depth != null) axis = D.zP - q._depth + R;   // custom: depth to the trough bottom
+        var len = q.w;
+        solid = union(S, [cylX(S, -len / 2, len / 2, 0, axis, R, seg), box(S, -len / 2, -R, axis, len / 2, R, zTop)]);
+      } else if (q.type === 'hex') {
+        var Rh = q.w / Math.sqrt(3), hex = [];
+        for (var i = 0; i < 6; i++) hex.push([Rh * Math.cos(i * Math.PI / 3), Rh * Math.sin(i * Math.PI / 3)]);
+        solid = prism(S, [hex], D.zP - depth, zTop);
+      } else {
+        var pr = { w: q.w, l: q.l, cx: 0, cy: 0, depth: depth, node: r.node,
+                   shape: q.type === 'round' ? 'round' : 'rect', corner: q.type === 'capsule' ? Math.min(q.w, q.l) / 2 : null };
+        solid = pocket(S, D, P, pr, zTop, null);
+      }
+      if (!solid) return;
+      var turned = turn(S, solid, q.rot || 0);
+      out.push(move(S, turned, r.cx + q.x, r.cy + q.y, 0));
+    });
+    return clip ? inter(S, union(S, out), clip) : union(S, out);
+  }
+
   /* ── hinge (canonical frame: hinge edge at +y) ──────────────────── */
   function addHinge(S, D, base, lid) {
     var hg = D.hinge;
@@ -1234,7 +1269,7 @@ window.CS = window.CS || {};
         // Sides without a lip end a clearance short of the lid's filled groove.
         base = union(S, [base, sub(S, lipRing, lipCuts(S, D, D.lipC))]);
       }
-      var cuts = D.rects.map(function (r) { return pocket(S, D, P, r, zTop, interiorPrism); });
+      var cuts = D.rects.map(function (r) { return sectionCut(S, D, P, r, zTop, interiorPrism); });
 
       if (D.notches.length) {
         var keepIn = 1 + D.grow;

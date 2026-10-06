@@ -7,7 +7,7 @@
  * a valid closed solid, and the 3MF must carry its colour assignments. */
 import { load, toManifold } from './harness.mjs';
 
-const { CS, wasm } = await load(['util.js', 'texture.js', 'layout.js', 'geometry.js', 'zip.js', 'export.js']);
+const { CS, wasm } = await load(['util.js', 'texture.js', 'items.js', 'layout.js', 'geometry.js', 'zip.js', 'export.js']);
 
 let failed = 0, passed = 0;
 function check(name, ok, detail) {
@@ -104,6 +104,22 @@ function variants() {
   s5.layout = CS.newSection({ w: 80, l: 50, h: 30 });
   s5.seat = 'floor'; s5.split = 0.5; s5.clasp.type = 'none';
   out.push(['single compartment, 50/50, no clasp', s5]);
+  // Shaped compartments: an air pump, batteries, bits, cards and free shapes.
+  const it1 = CS.defaults();
+  const secs1 = CS.layout.sections(it1.layout);
+  secs1[0].item = 'stepped'; secs1[0].params = { stepped: { segs: [{ d: 42, len: 105 }, { d: 22, len: 28 }, { d: 9, len: 30 }] } };
+  secs1[1].item = 'batteries'; secs1[1].params = { batteries: { type: 'AA', rows: 2, cols: 3, lying: 'yes' } };
+  secs1[2].item = 'bits'; secs1[2].params = { bits: { rows: 2, cols: 4 } };
+  out.push(['stepped pump, lying AA, hex bits', it1]);
+  const it2 = CS.defaults();
+  const secs2 = CS.layout.sections(it2.layout);
+  secs2[0].item = 'custom';
+  secs2[0].prims = [CS.newPrim('cyl', { w: 90, l: 28 }), CS.newPrim('rect', { x: 30, y: 22, w: 24, l: 18, rot: 30, depth: 6 }),
+                    CS.newPrim('capsule', { x: -30, y: -20, w: 50, l: 12, rot: -15 }), CS.newPrim('hex', { x: 45, y: -18, w: 12 })];
+  secs2[1].item = 'cards'; secs2[1].params = { cards: { type: 'SD', count: 5 } };
+  secs2[2].item = 'batteries'; secs2[2].params = { batteries: { type: '18650', rows: 1, cols: 2 } };
+  out.push(['custom shapes, SD slots, standing 18650', it2]);
+
   const tr = CS.defaults();
   tr.build = 'tray'; tr.gridfinity.enabled = true; tr.texture.enabled = true; tr.texture.pattern = 'bricks';
   out.push(['gridfinity tray (base only), bricks', tr]);
@@ -179,6 +195,35 @@ for (const [name, state] of variants()) {
   check('print layout pieces are apart', flat < 1e-3, flat.toFixed(4) + ' mm³');
   const bad = model.warnings.filter(w => w.level === 'bad');
   check('no blocking warnings', !bad.length, bad.map(w => w.msg).join(' | '));
+}
+
+console.log('items');
+{
+  // A lying cylinder rests on the compartment floor: its trough bottom is the floor.
+  const s = CS.defaults(); s.layout = CS.newSection({ item: 'cylinder', params: { cylinder: { d: 30, len: 100 } } });
+  s.selected = s.layout.id;
+  const D = CS.resolve(s), r = D.rects[0];
+  check('a lying cylinder reserves its length × diameter plus fit', Math.abs(r.w - (100 + 2 * s.fit)) < 1e-6 && Math.abs(r.l - (30 + 2 * s.fit)) < 1e-6,
+        r.w.toFixed(2) + ' × ' + r.l.toFixed(2));
+  check('the closed case has room for the whole cylinder', D.Hi >= 30 && D.Ht >= 30 - r.node._depth, 'Hi ' + D.Hi + ', in base ' + r.node._depth + ', lid ' + D.Ht);
+  const m = CS.buildModel(s, { decor: false });
+  const base = m.parts.find(p => p.key === 'base');
+  const mb = toManifold(wasm, base);
+  // A probe at the cylinder's lowest line should be empty; just under it, solid.
+  const zf = D.zP - r.node._depth;
+  const probe = (z) => { const b = wasm.Manifold.cube([4, 4, 0.1], true).translate([0, 0, z]); const v = b.intersect(mb).volume(); b.delete(); return v; };
+  check('the trough bottom sits on the compartment floor', probe(zf + 0.3) < 1e-3 && probe(zf - 0.3) > 1e-3,
+        'above ' + probe(zf + 0.3).toFixed(4) + ', below ' + probe(zf - 0.3).toFixed(4));
+  const edge = (y, z) => { const b = wasm.Manifold.cube([4, 0.2, 0.2], true).translate([0, y, z]); const v = b.intersect(mb).volume(); b.delete(); return v; };
+  const Rr = r.l / 2;
+  check('the trough is round: solid beside the bottom, open at the axis', edge(Rr * 0.8, zf + 1) > 1e-4 && edge(Rr * 0.8, zf + Rr) < 1e-4,
+        edge(Rr * 0.8, zf + 1).toFixed(4) + ' / ' + edge(Rr * 0.8, zf + Rr).toFixed(4));
+  mb.delete();
+  const st = CS.itemShape(CS.newSection({ item: 'stepped', params: { stepped: { segs: [{ d: 40, len: 100 }, { d: 20, len: 30 }] } } }), 0.4);
+  check('stepped cylinder sections share one axis', st.prims.every(q => Math.abs(q.axis - (40 + 0.8) / 2) < 1e-9) && Math.abs(st.w - 130.8) < 1e-9,
+        st.prims.map(q => q.axis).join(',') + ' w ' + st.w);
+  const bt = CS.itemShape(CS.newSection({ item: 'batteries', params: { batteries: { type: 'AA', rows: 2, cols: 3, hold: 50 } } }), 0.4);
+  check('standing batteries hold half their length', bt.prims.length === 6 && bt.prims.every(q => Math.abs(q.depth - 25.25) < 1e-9) && bt.h === 50.5);
 }
 
 console.log('layout');

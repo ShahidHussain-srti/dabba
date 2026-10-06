@@ -17,8 +17,20 @@ the geometry engine ([Manifold](https://github.com/elalish/manifold)) is bundled
 - **Number fields**: type exact values, or drag sideways on a field's label or the edges
   of its box to change it, as in Unity's inspector. Shift for big steps, Alt for fine.
 
-- **Compartments**: as many as you like. Each one is sized by its object (width, length,
-  height), and the fit clearance is added around it. Rectangular or round/oval.
+- **Compartments**: as many as you like. Each one says what it **holds**, and the fit
+  clearance is added around it:
+  - **Box**, **Round / oval** and **Capsule**: sized by the object's width, length and
+    height.
+  - **Lying cylinder**: a torch, a bottle or a rolled cable, cradled in a round trough.
+  - **Stepped cylinder**: round sections of different sizes end to end on one axis, such
+    as a battery air pump's body, neck and nozzle, or a screwdriver. Add or remove sections.
+  - **Battery holder** (AA, AAA, C, D, 18650, 21700, CR123A, 9 V, coin cells), standing
+    or lying; **hex bit holder**; **card slots** for SD, microSD, USB sticks and CF. Rows,
+    counts, hold depth and walls are all adjustable.
+  - **Custom shapes**: build the pocket from boxes, ovals, capsules, hexagons and lying
+    cylinders. In the plan, drag a shape to move it, drag its corner square to resize it,
+    and drag its round handle to turn it (`[` and `]` turn by 15°). Each shape can have its
+    own depth, or follow the compartment's depth.
   - **Pocket depth** is set per compartment. On automatic, shorter objects sit flush with
     the rim; switch to *Reach the floor* to drop every pocket to the bottom.
   - **Inner walls** are never thinner than the setting. Where neighbours differ in size,

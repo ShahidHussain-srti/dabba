@@ -176,10 +176,37 @@ window.CS = window.CS || {};
     // Cavities: deeper reads darker.
     var self = this;
     D.rects.forEach(function (r) {
-      var k = 0.28 + 0.42 * (r.node._depth / Math.max(D.Hb, 0.1));
-      ctx.fillStyle = shade(baseC, k);
-      self._cavityPath(ctx, t, r);
-      ctx.fill();
+      var sh = r.node._shape;
+      if (!sh || sh.fill) {
+        var k = 0.28 + 0.42 * (r.node._depth / Math.max(D.Hb, 0.1));
+        ctx.fillStyle = shade(baseC, k);
+        self._cavityPath(ctx, t, r);
+        ctx.fill();
+        return;
+      }
+      // What it holds, shape by shape, on a faint footprint.
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = shade(baseC, 0.35);
+      ctx.strokeRect(sx(t, r.x0) + 0.5, sy(t, r.y1) + 0.5, r.w * t.s - 1, r.l * t.s - 1);
+      ctx.restore();
+      sh.prims.forEach(function (q) {
+        var k2 = 0.28 + 0.42 * ((q._depth != null ? q._depth : r.node._depth) / Math.max(D.Hb, 0.1));
+        ctx.fillStyle = shade(baseC, k2);
+        self._primPath(ctx, t, r, q);
+        ctx.fill();
+        if (q.type === 'cyl') {      // a lying cylinder: show its axis
+          var a = (q.rot || 0) * Math.PI / 180, hw = q.w / 2;
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+          ctx.setLineDash([2, 3]);
+          ctx.beginPath();
+          ctx.moveTo(sx(t, r.cx + q.x - hw * Math.cos(a)), sy(t, r.cy + q.y - hw * Math.sin(a)));
+          ctx.lineTo(sx(t, r.cx + q.x + hw * Math.cos(a)), sy(t, r.cy + q.y + hw * Math.sin(a)));
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
     });
     D.notches.forEach(function (n) {
       ctx.fillStyle = shade(baseC, 0.55);
@@ -190,6 +217,7 @@ window.CS = window.CS || {};
     D.rects.forEach(function (r) { self._label(ctx, t, r); });
 
     this._selection(ctx, t);
+    this._primSelection(ctx, t);
     this._dims(ctx, t);
     this._badge(ctx, W);
   };
@@ -214,12 +242,71 @@ window.CS = window.CS || {};
     }
   };
 
+  Plan.prototype._primPath = function (ctx, t, r, q) {
+    var pts = CS.primOutline(q, 40);
+    ctx.beginPath();
+    pts.forEach(function (p, i) {
+      var X = sx(t, r.cx + p[0]), Y = sy(t, r.cy + p[1]);
+      if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y);
+    });
+    ctx.closePath();
+  };
+
+  /* The selected compartment, when it is built from free shapes. */
+  Plan.prototype.customRect = function () {
+    var D = this.D, sel = this.state.selected;
+    var r = D && D.rects.filter(function (q) { return q.id === sel; })[0];
+    return r && r.node.item === 'custom' && r.node._shape ? r : null;
+  };
+
+  /* Handles of shape i of a custom compartment, in CSS px: a square at its
+     corner (resize) and a disc beyond its top edge (turn). */
+  Plan.prototype.primHandles = function (t, r, q) {
+    var a = (q.rot || 0) * Math.PI / 180, c = Math.cos(a), s2 = Math.sin(a);
+    var corner = [q.w / 2, q.type === 'hex' ? q.w / 2 : q.l / 2];
+    var cxw = r.cx + q.x, cyw = r.cy + q.y;
+    var kx = cxw + corner[0] * c - corner[1] * s2, ky = cyw + corner[0] * s2 + corner[1] * c;
+    var up = (q.type === 'hex' ? q.w : q.l) / 2;
+    var ux = cxw - up * s2, uy = cyw + up * c;
+    var ox = -s2, oy = c, gap = 16 / t.s;
+    return { resize: { x: sx(t, kx), y: sy(t, ky) }, rotate: { x: sx(t, ux + ox * gap), y: sy(t, uy + oy * gap) },
+             stem: { x: sx(t, ux), y: sy(t, uy) }, centre: { x: sx(t, cxw), y: sy(t, cyw) } };
+  };
+
+  Plan.prototype._primSelection = function (ctx, t) {
+    var r = this.customRect();
+    if (!r) return;
+    var s = r.node, self = this, sel = s._sel || 0;
+    r.node._shape.prims.forEach(function (q, i) {
+      var hot = self.hover && self.hover.prim === i;
+      if (i !== sel && !hot) return;
+      ctx.save();
+      self._primPath(ctx, t, r, q);
+      ctx.strokeStyle = i === sel ? '#ffd166' : 'rgba(255,209,102,0.6)';
+      ctx.lineWidth = i === sel ? 2 : 1.25;
+      ctx.setLineDash(i === sel ? [] : [4, 3]);
+      ctx.stroke();
+      ctx.restore();
+      if (i !== sel) return;
+      var h = self.primHandles(t, r, q);
+      ctx.save();
+      ctx.strokeStyle = '#ffd166'; ctx.fillStyle = '#ffd166'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(h.stem.x, h.stem.y); ctx.lineTo(h.rotate.x, h.rotate.y); ctx.stroke();
+      ctx.beginPath(); ctx.arc(h.rotate.x, h.rotate.y, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(h.resize.x - 5, h.resize.y - 5, 10, 10);
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1;
+      ctx.strokeRect(h.resize.x - 5, h.resize.y - 5, 10, 10);
+      ctx.restore();
+    });
+  };
+
   Plan.prototype._label = function (ctx, t, r) {
     var s = r.node, w = r.w * t.s, h = r.l * t.s;
     if (w < 36 || h < 22) return;
     var name = s.name || CS.layout.label(s, this.D.sections);
-    var l1 = fmt(s.w) + ' × ' + fmt(s.l);
-    var l2 = 'h ' + fmt(s.h) + (Math.abs(s._depth - s.h) > 0.05 ? ' · depth ' + fmt(s._depth) : '');
+    var l1 = CS.itemByKey(s.item).size ? fmt(s.w) + ' × ' + fmt(s.l) : CS.itemSummary(s);
+    var hh = s._shape ? s._shape.h : s.h;
+    var l2 = 'h ' + fmt(hh) + (Math.abs(s._depth - hh) > 0.05 ? ' · depth ' + fmt(s._depth) : '');
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -318,6 +405,45 @@ window.CS = window.CS || {};
       ctx.fillText(txt, bx + 7, by + 10);
       ctx.restore();
     }
+  };
+
+  /* Move, resize or turn one shape of a custom compartment. The layout
+     reflows as the footprint changes, so the view is panned to keep the
+     shape under the pointer, the way edge resizing holds the far edge. */
+  Plan.prototype._dragPrim = function (e, p) {
+    var d = this.drag, t = this.frozen, found = CS.layout.find(this.state.layout, d.id);
+    if (!found) return;
+    var node = found.node, src = node.prims[d.prim];
+    if (!src) return;
+    var fit = this.D.fit, step = e.shiftKey ? 0.1 : 0.5;
+    var snap = function (v) { return Math.round(v / step) * step; };
+    if (d.handle === 'move') {
+      src.x = snap(d.sx0 + (p.x - d.x) / t.s);
+      src.y = snap(d.sy0 - (p.y - d.y) / t.s);
+      d.cx = p.x - d.grabX; d.cy = p.y - d.grabY;
+    } else {
+      // Pointer in the shape's own frame, around its (fixed) centre.
+      var a = (src.rot || 0) * Math.PI / 180, dx = (p.x - d.cx) / t.s, dy = -(p.y - d.cy) / t.s;
+      if (d.handle === 'resize') {
+        var lx = dx * Math.cos(a) + dy * Math.sin(a), ly = -dx * Math.sin(a) + dy * Math.cos(a);
+        src.w = Math.max(2, snap(2 * Math.abs(lx) - 2 * fit));
+        if (src.type === 'hex') src.l = src.w; else src.l = Math.max(2, snap(2 * Math.abs(ly) - 2 * fit));
+      } else {
+        var deg = Math.atan2(dy, dx) * 180 / Math.PI - 90;
+        src.rot = ((e.shiftKey ? Math.round(deg) : Math.round(deg / 15) * 15) + 360) % 360;
+      }
+    }
+    // Reflow, then pan so the shape's centre lands where it should on screen.
+    this.describe();
+    var r = this.D.rects.filter(function (q) { return q.id === d.id; })[0];
+    var q = r && r.node._shape.prims[d.prim];
+    if (q) {
+      this.frozen.ox += d.cx - sx(this.frozen, r.cx + q.x);
+      this.frozen.oy += d.cy - sy(this.frozen, r.cy + q.y);
+    }
+    this.canvas.style.cursor = d.handle === 'move' ? 'grabbing' : d.handle === 'resize' ? 'nwse-resize' : 'alias';
+    this.draw();
+    this.hooks.change(true);
   };
 
   Plan.prototype._edgeGlow = function (ctx, t, r, edge) {
@@ -446,6 +572,20 @@ window.CS = window.CS || {};
     for (var i = 0; i < btns.length; i++) {
       if (Math.hypot(x - btns[i].x, y - btns[i].y) <= btns[i].r + 2) return { button: btns[i].key, b: btns[i] };
     }
+    // Shapes of the selected custom compartment, handles first.
+    var cr = this.customRect();
+    if (cr) {
+      var prims = cr.node._shape.prims, selp = cr.node._sel || 0;
+      if (prims[selp]) {
+        var hh = this.primHandles(t, cr, prims[selp]);
+        if (Math.hypot(x - hh.rotate.x, y - hh.rotate.y) <= 8) return { id: cr.id, prim: selp, handle: 'rotate' };
+        if (Math.abs(x - hh.resize.x) <= 7 && Math.abs(y - hh.resize.y) <= 7) return { id: cr.id, prim: selp, handle: 'resize' };
+      }
+      var mmx = (x - t.ox) / t.s - cr.cx, mmy = (t.oy - y) / t.s - cr.cy;
+      for (var pi = prims.length - 1; pi >= 0; pi--) {
+        if (inPoly(mmx, mmy, CS.primOutline(prims[pi], 24))) return { id: cr.id, prim: pi };
+      }
+    }
     // Edges of any compartment, selected one first.
     var order = D.rects.slice().sort(function (a, b) {
       return (b.id === this.state.selected) - (a.id === this.state.selected);
@@ -458,7 +598,9 @@ window.CS = window.CS || {};
       if (inY) cands.push(['left', Math.abs(x - x0)], ['right', Math.abs(x - x1)]);
       if (inX) cands.push(['back', Math.abs(y - yT)], ['front', Math.abs(y - yB)]);
       cands.sort(function (a, b) { return a[1] - b[1]; });
-      if (cands.length && cands[0][1] <= EDGE_PX) return { id: r.id, edge: cands[0][0] };
+      // Only a sized box / oval / capsule has edges to drag; other items take
+      // their size from what they hold.
+      if (cands.length && cands[0][1] <= EDGE_PX && CS.itemByKey(r.node.item).size) return { id: r.id, edge: cands[0][0] };
     }
     for (var k = 0; k < D.rects.length; k++) {
       var q = D.rects[k];
@@ -472,6 +614,15 @@ window.CS = window.CS || {};
     return null;
   };
 
+  function inPoly(x, y, pts) {
+    var inside = false;
+    for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      var yi = pts[i][1], yj = pts[j][1];
+      if ((yi > y) !== (yj > y) && x < (pts[j][0] - pts[i][0]) * (y - yi) / (yj - yi) + pts[i][0]) inside = !inside;
+    }
+    return inside;
+  }
+
   Plan.prototype._bind = function () {
     var self = this, canvas = this.canvas;
 
@@ -482,6 +633,9 @@ window.CS = window.CS || {};
     function cursorFor(h) {
       if (!h) return 'default';
       if (h.button) return 'pointer';
+      if (h.handle === 'resize') return 'nwse-resize';
+      if (h.handle === 'rotate') return 'alias';
+      if (h.prim != null) return 'move';
       if (h.edge) return (h.edge === 'left' || h.edge === 'right') ? 'ew-resize' : 'ns-resize';
       if (h.id || h.panel) return 'pointer';
       return 'default';
@@ -500,6 +654,25 @@ window.CS = window.CS || {};
       }
       if (h.panel) { self.hooks.focus(h.panel); return; }
       if (h.id && h.id !== self.state.selected) self.hooks.select(h.id);
+      if (h.prim != null) {
+        var cr = self.customRect();
+        if (!cr) return;
+        var node = cr.node, q = node._shape.prims[h.prim], src = q.src;
+        if (node._sel !== h.prim) { node._sel = h.prim; self.hooks.primSelect(h.prim); }
+        if (!src) return;
+        var t0 = self.transform();
+        self.hooks.beginEdit();
+        self.frozen = { s: t0.s, ox: t0.ox, oy: t0.oy };
+        var cx0 = sx(t0, cr.cx + q.x), cy0 = sy(t0, cr.cy + q.y);
+        self.drag = { kind: 'prim', id: cr.id, prim: h.prim, handle: h.handle || 'move', x: p.x, y: p.y,
+                      sx0: src.x, sy0: src.y, rot0: src.rot || 0,
+                      // where the shape's centre sits on screen, held there as the layout reflows
+                      cx: cx0, cy: cy0, grabX: p.x - cx0, grabY: p.y - cy0 };
+        canvas.setPointerCapture(e.pointerId);
+        self.draw();
+        e.preventDefault();
+        return;
+      }
       if (h.edge) {
         var found = CS.layout.find(self.state.layout, h.id);
         if (!found) return;
@@ -525,6 +698,7 @@ window.CS = window.CS || {};
 
     canvas.addEventListener('pointermove', function (e) {
       var p = local(e);
+      if (self.drag && self.drag.kind === 'prim') { self._dragPrim(e, p); return; }
       if (self.drag) {
         var d = self.drag, t = self.frozen;
         var found = CS.layout.find(self.state.layout, d.id);
@@ -551,8 +725,9 @@ window.CS = window.CS || {};
       }
       var h = self.hit(p.x, p.y);
       canvas.style.cursor = cursorFor(h);
-      var key = h ? (h.button || '') + (h.id || '') + (h.edge || '') : '';
-      var prev = self.hover ? (self.hover.button || '') + (self.hover.id || '') + (self.hover.edge || '') : '';
+      var key = h ? (h.button || '') + (h.id || '') + (h.edge || '') + (h.prim != null ? 'p' + h.prim : '') : '';
+      var prev = self.hover ? (self.hover.button || '') + (self.hover.id || '') + (self.hover.edge || '') +
+                 (self.hover.prim != null ? 'p' + self.hover.prim : '') : '';
       if (key !== prev) { self.hover = h; self.draw(); }
     });
 
@@ -576,6 +751,21 @@ window.CS = window.CS || {};
     });
 
     canvas.addEventListener('keydown', function (e) {
+      var crk = self.customRect();
+      if (crk && (e.key === '[' || e.key === ']')) {
+        e.preventDefault();
+        var srcq = crk.node._shape.prims[crk.node._sel || 0];
+        if (srcq && srcq.src) { self.hooks.beginEdit(); srcq.src.rot = ((srcq.src.rot || 0) + (e.key === ']' ? 15 : -15) + 360) % 360; self.hooks.change(false); }
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && crk && (crk.node.prims || []).length > 1) {
+        e.preventDefault();
+        self.hooks.beginEdit();
+        crk.node.prims.splice(crk.node._sel || 0, 1);
+        crk.node._sel = Math.max(0, (crk.node._sel || 0) - 1);
+        self.hooks.change(false);
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         self.hooks.remove(self.state.selected);

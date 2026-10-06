@@ -105,7 +105,12 @@ window.CS = window.CS || {};
 
     var fit = Math.max(0, state.fit);
     var hmax = 0;
-    secs.forEach(function (s) { if (s.h > hmax) hmax = s.h; });
+    // What each compartment holds, as pocket shapes (items.js).
+    secs.forEach(function (s) {
+      if (!s.item) s.item = s.shape === 'round' ? 'round' : 'box';
+      s._shape = CS.itemShape(s, fit);
+      if (s._shape.h > hmax) hmax = s._shape.h;
+    });
 
     var autoHi = snap(hmax + Math.max(0, state.headroom), 'up');
     var Hi = state.interior.auto ? autoHi : snap(Math.max(state.interior.height, lh * 4));
@@ -126,15 +131,22 @@ window.CS = window.CS || {};
     var depthMax = 0;
     secs.forEach(function (s) {
       var d;
+      var sh = s._shape;
       if (s.depth != null && isFinite(s.depth)) d = CS.clamp(snap(s.depth), lh, Hb);
-      else if (state.seat === 'flush') d = Math.min(snap(s.h), Hb);
+      else if (state.seat === 'flush') d = Math.min(snap(sh.h), Hb);
       else d = Hb;
       s._depth = CS.tidy(d);
+      // Shapes with their own hold depth (bits, standing batteries) may go no
+      // deeper than the base allows.
+      sh.prims.forEach(function (q) {
+        q._depth = q.depth != null && isFinite(q.depth) ? CS.clamp(snap(q.depth), lh, Hb) : s._depth;
+        if (q._depth > depthMax) depthMax = q._depth;
+      });
       s._margin = s._depth * tanP;          // the taper widens the cavity this much at the rim
-      s._cw = s.w + 2 * fit;
-      s._cl = s.l + 2 * fit;
+      s._cw = sh.w;
+      s._cl = sh.l;
       if (s._depth > depthMax) depthMax = s._depth;
-      var stickUp = s.h - s._depth;
+      var stickUp = sh.h - s._depth;
       if (tray && stickUp > 0.05) {
         warn.push({ level: 'warn', msg: label(s, secs) + ' stands ' + stickUp.toFixed(1) + ' mm above the rim of the tray.' });
       } else if (!tray && stickUp > Ht - 0.1 + 1e-6) {

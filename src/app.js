@@ -127,6 +127,15 @@
       bs.appendChild(o);
     });
 
+    var hs = $('#f-s-item'), hgroups = {};
+    CS.ITEMS.forEach(function (it) {
+      var g = hgroups[it.group];
+      if (!g) { g = hgroups[it.group] = document.createElement('optgroup'); g.label = it.group; hs.appendChild(g); }
+      var o = document.createElement('option');
+      o.value = it.key; o.textContent = it.name;
+      g.appendChild(o);
+    });
+
     var tx = $('#f-tex');
     CS.TEXTURES.forEach(function (t) {
       var o = document.createElement('option');
@@ -294,8 +303,11 @@
   }
 
   /* ── declarative two-way binding ───────────────────────────────── */
-  function bind() {
-    $$('[data-bind]').forEach(function (el) {
+  function bind() { $$('[data-bind]').forEach(bindEl); }
+
+  function bindEl(el) {
+      if (el._bound) return;
+      el._bound = true;
       var path = el.dataset.bind;
 
       if (el.classList.contains('seg')) {
@@ -316,7 +328,9 @@
       el.addEventListener(ev, function () {
         if (getV(path) === undefined) return;   // no such element selected
         var v = el.type === 'checkbox' ? el.checked : el.value;
-        v = coerce(path, v);
+        // An empty nullable number means "automatic".
+        if (el.dataset.nullable != null) v = el.value === '' ? null : parseFloat(el.value);
+        else v = coerce(path, v);
         if (typeof v === 'number' && !isFinite(v)) return;   // half-typed number
         // Sliders and typing coalesce into one undo step; discrete pickers don't.
         var continuous = el.type === 'range' || el.type === 'number' || el.tagName === 'TEXTAREA' ||
@@ -329,7 +343,6 @@
         // Settle the field to the stored value once typing is done.
         el.addEventListener('change', function () { refreshValues(); });
       }
-    });
   }
 
   function syncSeg(el, path) {
@@ -344,9 +357,9 @@
       if (el === except) return;
       var path = el.dataset.bind, v = getV(path);
       if (el.classList.contains('seg')) { syncSeg(el, path); return; }
-      if (v === undefined) return;
+      if (v === undefined || (v === null && el.dataset.nullable == null)) return;
       if (el.type === 'checkbox') el.checked = !!v;
-      else if (el.type === 'number') el.value = Math.round(v * 1000) / 1000;
+      else if (el.type === 'number') el.value = v == null ? '' : Math.round(v * 1000) / 1000;
       else el.value = v;
     });
   }
@@ -459,11 +472,12 @@
       b.type = 'button';
       b.className = 'itemrow' + (s.id === state.selected ? ' on' : '');
       b.innerHTML = '<span class="dot"></span><span class="txt"></span><span class="num"></span>';
-      $('.dot', b).style.background = s.shape === 'round' ? 'transparent' : 'var(--ink3)';
-      $('.dot', b).style.borderRadius = s.shape === 'round' ? '50%' : '3px';
+      var roundish = s.item === 'round' || s.item === 'cylinder' || s.item === 'stepped' || s.item === 'batteries';
+      $('.dot', b).style.background = roundish ? 'transparent' : 'var(--ink3)';
+      $('.dot', b).style.borderRadius = roundish ? '50%' : '3px';
       $('.dot', b).style.boxShadow = 'inset 0 0 0 2px var(--ink3)';
       $('.txt', b).textContent = s.name || 'Compartment ' + (i + 1);
-      $('.num', b).textContent = fmt(s.w) + '×' + fmt(s.l) + '×' + fmt(s.h);
+      $('.num', b).textContent = CS.itemSummary(s);
       b.addEventListener('click', function () { select(s.id, true); });
       box.appendChild(b);
     });
@@ -472,13 +486,14 @@
     var s = sectionNow();
     $('#sec-editor').hidden = !s;
     if (!s) return;
+    paintItem(s);
     var auto = s.depth == null;
     $('#sec-depth-auto').checked = auto;
     var dEl = $('#sec-depth');
     if (document.activeElement !== dEl) dEl.value = s._depth != null ? s._depth : '';
     dEl.disabled = auto;
     $('#sec-depth-now').textContent = s._depth != null ? s._depth.toFixed(2) + ' mm' : '';
-    var up = s.h - (s._depth || 0);
+    var up = (s._shape ? s._shape.h : s.h) - (s._depth || 0);
     $('#sec-depth-hint').textContent = (auto
       ? (state.seat === 'flush' ? 'Matched to the object, up to the full ' + D.Hb.toFixed(1) + ' mm the base allows.'
                                 : 'Reaches the floor: the full ' + D.Hb.toFixed(1) + ' mm of the base.')
@@ -502,6 +517,155 @@
 
   function fmt(v) { return String(Math.round(v * 10) / 10); }
 
+  /* ── what a compartment holds ─────────────────────────────────────── */
+  /* The settings under "Holds" depend on the item, so they are built here and
+     rebuilt only when the item (or the number of sections / shapes) changes —
+     never while you type in one of them. */
+  var itemSig = '';
+  function numField(label, path, opts) {
+    opts = opts || {};
+    var wrap = document.createElement('label');
+    wrap.className = 'pf';
+    wrap.innerHTML = '<span></span><span class="nf"><input type="number"></span>';
+    wrap.firstChild.textContent = label;
+    var nf = wrap.lastChild, inp = nf.firstChild;
+    nf.dataset.unit = opts.unit == null ? 'mm' : opts.unit;
+    inp.dataset.bind = path;
+    inp.step = opts.step || 0.1;
+    if (opts.min != null) inp.min = opts.min;
+    if (opts.max != null) inp.max = opts.max;
+    if (opts.nullable) { inp.dataset.nullable = ''; inp.placeholder = 'auto'; }
+    return wrap;
+  }
+  function selField(label, path, options) {
+    var wrap = document.createElement('label');
+    wrap.className = 'pf';
+    wrap.innerHTML = '<span></span><select></select>';
+    wrap.firstChild.textContent = label;
+    var sel = wrap.lastChild;
+    sel.dataset.bind = path;
+    options.forEach(function (o) {
+      var op = document.createElement('option');
+      op.value = o[0]; op.textContent = o[1];
+      sel.appendChild(op);
+    });
+    return wrap;
+  }
+  function smallBtn(text, cls, fn) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'ghost ' + (cls || ''); b.textContent = text;
+    b.addEventListener('click', fn);
+    return b;
+  }
+
+  function paintItem(s) {
+    var it = CS.itemByKey(s.item);
+    $('#item-hint').textContent = it.hint || '';
+    $('#item-size').style.display = it.size || it.custom ? '' : 'none';
+    $$('#item-size [data-sz=wl]').forEach(function (el) { el.style.display = it.custom ? 'none' : ''; });
+    if (!it.custom) {
+      s.params = s.params || {};
+      s.params[it.key] = CS.itemParams(s);           // defaults written in, so fields can bind
+    } else if (!s.prims || !s.prims.length) {
+      s.prims = [CS.newPrim('rect', { w: s.w, l: s.l })];
+    }
+    var p = s.params && s.params[it.key];
+    var sig = [s.id, it.key, p && p.segs ? p.segs.length : 0, it.custom ? s.prims.length : 0, it.custom ? s._sel || 0 : 0].join('|');
+    if (sig === itemSig) return;
+    itemSig = sig;
+
+    var box = $('#item-params');
+    box.innerHTML = '';
+    var grid = document.createElement('div');
+    grid.className = 'pgrid';
+    (it.params || []).forEach(function (d) {
+      if (Array.isArray(d)) grid.appendChild(numField(d[1], '~s.params.' + it.key + '.' + d[0], { step: d[5], min: d[3], max: d[4], unit: d[6] != null ? d[6] : /^(rows|cols|count)$/.test(d[0]) ? '' : 'mm' }));
+      else grid.appendChild(selField(d.label, '~s.params.' + it.key + '.' + d.key, d.options));
+    });
+    if (grid.childNodes.length) box.appendChild(grid);
+
+    if (it.segments) {
+      var h = document.createElement('h3'); h.textContent = 'Sections, end to end';
+      box.appendChild(h);
+      p.segs.forEach(function (q, i) {
+        var row = document.createElement('div');
+        row.className = 'segrow';
+        var tag = document.createElement('span'); tag.className = 'segtag'; tag.textContent = i + 1;
+        row.appendChild(tag);
+        row.appendChild(numField('⌀', '~s.params.stepped.segs.' + i + '.d', { min: 1 }));
+        row.appendChild(numField('Length', '~s.params.stepped.segs.' + i + '.len', { min: 1 }));
+        row.appendChild(smallBtn('✕', 'danger iconbtn', function () {
+          if (p.segs.length <= 1) return;
+          beginEdit(0); p.segs.splice(i, 1); apply();
+        }));
+        box.appendChild(row);
+      });
+      var add = document.createElement('div');
+      add.className = 'row inlinerow';
+      add.appendChild(smallBtn('+ Add section', '', function () {
+        beginEdit(0);
+        var last = p.segs[p.segs.length - 1] || { d: 20, len: 20 };
+        p.segs.push({ d: Math.max(4, Math.round(last.d * 0.6)), len: 20 });
+        apply();
+      }));
+      box.appendChild(add);
+      var hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = 'Measure each round section from one end to the other: for an air pump, the body, then the neck, then the nozzle. They share one axis and the object rests on the widest.';
+      box.appendChild(hint);
+    }
+
+    if (it.custom) {
+      var h2 = document.createElement('h3'); h2.textContent = 'Shapes';
+      box.appendChild(h2);
+      s.prims.forEach(function (q, i) {
+        var card = document.createElement('div');
+        card.className = 'primcard' + (i === (s._sel || 0) ? ' on' : '');
+        card.addEventListener('click', function (ev) {
+          if (ev.target.closest('input,select,button')) return;
+          s._sel = i; itemSig = ''; apply({ rebuild: false });
+        });
+        var top = document.createElement('div');
+        top.className = 'primtop';
+        top.appendChild(selField('', '~s.prims.' + i + '.type', CS.PRIMS));
+        top.appendChild(smallBtn('✕', 'danger iconbtn', function () {
+          if (s.prims.length <= 1) return;
+          beginEdit(0); s.prims.splice(i, 1); s._sel = Math.max(0, Math.min(s._sel || 0, s.prims.length - 1)); apply();
+        }));
+        card.appendChild(top);
+        var g2 = document.createElement('div');
+        g2.className = 'pgrid four';
+        g2.appendChild(numField(q.type === 'cyl' ? 'Length' : q.type === 'hex' ? 'Across flats' : 'Width', '~s.prims.' + i + '.w', { min: 1 }));
+        if (q.type !== 'hex') g2.appendChild(numField(q.type === 'cyl' ? 'Diameter' : 'Length', '~s.prims.' + i + '.l', { min: 1 }));
+        g2.appendChild(numField('Turn', '~s.prims.' + i + '.rot', { unit: '°', step: 1 }));
+        g2.appendChild(numField(q.type === 'cyl' ? 'Bottom depth' : 'Depth', '~s.prims.' + i + '.depth', { nullable: true, min: 0.5 }));
+        g2.appendChild(numField('X', '~s.prims.' + i + '.x', { step: 0.5 }));
+        g2.appendChild(numField('Y', '~s.prims.' + i + '.y', { step: 0.5 }));
+        card.appendChild(g2);
+        box.appendChild(card);
+      });
+      var adds = document.createElement('div');
+      adds.className = 'btngrid five';
+      CS.PRIMS.forEach(function (pr) {
+        adds.appendChild(smallBtn('+ ' + pr[1], '', function () {
+          beginEdit(0);
+          var last = s.prims[s.prims.length - 1];
+          s.prims.push(CS.newPrim(pr[0], { x: last ? last.x + 10 : 0, y: last ? last.y - 10 : 0 }));
+          s._sel = s.prims.length - 1;
+          apply();
+        }));
+      });
+      box.appendChild(adds);
+      var hint2 = document.createElement('p');
+      hint2.className = 'hint';
+      hint2.textContent = 'In the plan: drag a shape to move it, drag its square to resize, its round handle to turn ([ and ] turn by 15°). Depth left on auto follows the compartment; a lying cylinder\'s depth is to the bottom of its trough.';
+      box.appendChild(hint2);
+    }
+    $$('#item-params [data-bind]').forEach(bindEl);
+    $$('#item-params input[type=number]').forEach(function (inp) { scrubbable(inp, inp.closest('label') && inp.closest('label').firstChild); });
+    refreshValues();
+  }
+
   function bindSections() {
     $$('[data-add]').forEach(function (b) {
       b.addEventListener('click', function () { addSection(b.dataset.add); });
@@ -520,7 +684,7 @@
     $('#sec-depth-auto').addEventListener('change', function (e) {
       var s = sectionNow(); if (!s) return;
       beginEdit(0);
-      s.depth = e.target.checked ? null : (s._depth || s.h);
+      s.depth = e.target.checked ? null : (s._depth || (s._shape ? s._shape.h : s.h));
       apply();
     });
     $('#sec-depth').addEventListener('input', function (e) {
@@ -799,6 +963,11 @@
   }
 
   function onEdit(path, el) {
+    if (path === '~s.item') {
+      var sn = sectionNow();
+      if (sn) { sn.shape = sn.item === 'round' ? 'round' : 'rect'; itemSig = ''; }
+    }
+    if (/^~s\.prims\.\d+\.type$/.test(path)) itemSig = '';
     if (path === 'texture.border') {
       var b = state.texture.border;
       state.texture.borders = { base: { bottom: b, top: b, face: b }, lid: { bottom: b, top: b, face: b } };
@@ -1090,6 +1259,9 @@
         var out = Object.assign(base, n);
         out.grooves = Object.assign(CS.newSection().grooves, n.grooves || {});
         out.groove = Object.assign(CS.newSection().groove, n.groove || {});
+        if (!n.item) out.item = n.shape === 'round' ? 'round' : 'box';   // saved before item shapes
+        if (!out.params || typeof out.params !== 'object') out.params = {};
+        if (!Array.isArray(out.prims)) out.prims = [];
         if (!out.id) out.id = CS.newId('s');
         return out;
       })(ps.layout);
@@ -1230,6 +1402,7 @@
       add: function (id, side) { if (id !== state.selected) state.selected = id; addSection(side); },
       remove: removeSection,
       focus: focusPanel,
+      primSelect: function () { itemSig = ''; paintSections(); },
       beginEdit: function () { beginEdit(450); },
       change: function (dragging) {
         if (dragging) { D = CS.describe(state); paintSections(); refreshValues(); rebuild(); persist(); return; }

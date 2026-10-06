@@ -91,6 +91,7 @@ window.CS = window.CS || {};
     return Object.assign({
       id: CS.newId('s'), kind: 'section', name: '',
       w: 40, l: 30, h: 18, depth: null, shape: 'rect',
+      item: 'box', params: {}, prims: [],      // what it holds: see items.js
       alignX: 'center', alignY: 'center',
       grooves: { left: false, right: false, front: false, back: false },
       groove: { width: 18, depth: null }
@@ -119,7 +120,7 @@ window.CS = window.CS || {};
   CS.defaults = function () {
     var a = CS.newSection({ name: 'Large', w: 60, l: 40, h: 22 });
     var b = CS.newSection({ name: 'Small', w: 28, l: 18, h: 14 });
-    var c = CS.newSection({ name: 'Small', w: 28, l: 18, h: 10, shape: 'round' });
+    var c = CS.newSection({ name: 'Small', w: 28, l: 18, h: 10, shape: 'round', item: 'round' });
     return {
       name: 'case',
       build: 'case',            // 'case' = base + lid; 'tray' = base only
