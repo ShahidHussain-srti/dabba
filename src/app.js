@@ -1180,7 +1180,7 @@
 
         busy(true, 'Packing 3MF…');
         CS.exportThreeMF(model, state).then(function (blob) {
-          CS.download(blob, safeName() + '.3mf');
+          WB.download(blob, safeName() + '.3mf');
           busy(false);
           var n = model.stats.colors;
           showWarnings(model.warnings.concat([{
@@ -1204,7 +1204,7 @@
           var blob = CS.exportSTL({ parts: CS.printLayout(model) });
           busy(false);
           if (!blob) { showWarnings([{ level: 'bad', msg: 'Nothing to export.' }]); return; }
-          CS.download(blob, safeName() + '.stl');
+          WB.download(blob, safeName() + '.stl');
         } catch (e) {
           busy(false);
           showWarnings([{ level: 'bad', msg: 'Export failed: ' + e.message }]);
@@ -1213,7 +1213,7 @@
     });
 
     $('#btn-save').addEventListener('click', function () {
-      CS.download(new Blob([JSON.stringify(buildPayload())], { type: 'application/json' }),
+      WB.download(new Blob([JSON.stringify(buildPayload())], { type: 'application/json' }),
                   safeName() + '.case.json');
     });
 
