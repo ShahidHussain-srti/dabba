@@ -225,7 +225,7 @@ window.CS = window.CS || {};
   /* One-line description of what a compartment holds, for lists and labels. */
   CS.itemSummary = function (s) {
     var it = CS.itemByKey(s.item), p = CS.itemParams(s), f = function (v) { return String(Math.round(v * 10) / 10); };
-    if (it.size) return f(s.w) + '×' + f(s.l) + '×' + f(s.h);
+    if (it.size) return f(s._size ? s._size.w : s.w) + '×' + f(s._size ? s._size.l : s.l) + '×' + f(s.h);
     if (it.key === 'cylinder') return '⌀' + f(p.d) + ' × ' + f(p.len);
     if (it.key === 'stepped') return p.segs.length + ' sections, ⌀' + f(Math.max.apply(null, p.segs.map(function (q) { return q.d; }))) + ' max';
     if (it.key === 'batteries') return p.rows * p.cols + ' × ' + (BATTERIES[p.type] || BATTERIES.AA).label + (p.lying === 'yes' ? ' lying' : '');

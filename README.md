@@ -39,20 +39,24 @@ whatever you choose.
   one its own depth if you like.
 
 Each compartment also gets its own pocket depth (by default shorter things sit flush with
-the rim) and optional finger notches so you can get the object back out. Inner walls never
-go below the thickness you set. Where neighbouring compartments are different sizes, the
-wall between them gets thicker, unless you set a compartment to *Fill* and let it grow
-into the space instead.
+the rim), its own pocket shape (corner radius, floor rounding, rim round-over and taper,
+with a button to copy them to every compartment), and optional finger notches so you can
+get the object back out. Inner walls never go below the thickness you set. Resizing one
+compartment grows the case if it needs to, but never changes the others. Where neighbours
+are different sizes the wall between them gets thicker, unless you set a compartment to
+*Fill* so it grows into the space instead; its size then shows what Fill gives it and stays
+locked until you turn Fill off.
 
 ### The box itself
 
 - Wall, floor and lid thicknesses set separately.
-- Rounded or chamfered outer edges, an outer taper, and rounded or tapered pockets.
+- Rounded or chamfered outer edges and an outer taper.
 - Any base/lid split, not just half and half.
 - An alignment lip that can be turned off per edge, so the inside can be flush where
   you reach in.
-- A lid that's either open inside or mirrors the base's compartments, so things are held
-  from above when it's shut.
+- A lid that's open inside, has walls only (dividers over the base's walls, so nothing slides
+  between compartments), or mirrors the base's compartments exactly, with the same depth,
+  rounding and shapes, so things are held from above when it's shut.
 - A filament-pin hinge on any edge: count, knuckles, length, pin size and clearances are
   all adjustable.
 - Clasps: snap hooks, magnets, snap bumps, a hook latch on its own pin, or a swing hook
@@ -72,8 +76,10 @@ gets its own colour, set in, engraved or raised.
 
 ### Getting around
 
-Click a compartment in the plan to select it, drag its edges to resize, use **+** to add a
-neighbour and Delete to remove one. The 3D view can show the case closed, open at any angle,
+Click a compartment in the plan to select it, drag its edges or corners to resize it, and
+drag it to move it. A moved compartment can overlap its neighbours (the pockets merge) but
+stays inside the outer wall. Use **+** to add a neighbour, the dashed pills outside the case
+to add a compartment along a whole side, and Delete to remove one. The 3D view can show the case closed, open at any angle,
 or laid out for printing. Number boxes work like Unity's inspector: type a value, or drag
 sideways on the label or the edge of the box (Shift for bigger steps, Alt for finer).
 

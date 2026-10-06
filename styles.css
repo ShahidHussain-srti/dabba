@@ -88,3 +88,5 @@ button.danger:hover{border-color:var(--bad); color:var(--bad)}
 .primcard.on{border-color:#ffd166; box-shadow:0 0 0 1px rgba(255,209,102,.35)}
 .primtop{display:grid; grid-template-columns:1fr 28px; gap:6px; align-items:end; margin-bottom:6px}
 .btngrid.five{grid-template-columns:repeat(3,1fr); margin-bottom:8px}
+.trio label.locked .nf::before{content:"Fill"; position:absolute; left:8px; font-size:10px; color:var(--acc); font-family:var(--mono); pointer-events:none}
+.trio label.locked input{opacity:.75}

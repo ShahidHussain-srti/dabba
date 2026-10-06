@@ -257,6 +257,8 @@
       else if (el.type === 'number') el.value = v == null ? '' : Math.round(v * (+el.dataset.scale || 1) * 1000) / 1000;
       else el.value = v;
     });
+    var sn = sectionNow();
+    if (sn) paintFill(sn);
   }
 
   function refresh() {
@@ -382,6 +384,7 @@
     $('#sec-editor').hidden = !s;
     if (!s) return;
     paintItem(s);
+    paintFill(s);
     var auto = s.depth == null;
     $('#sec-depth-auto').checked = auto;
     var dEl = $('#sec-depth');
@@ -876,7 +879,29 @@
     persist();
   }
 
+  /* Fill hands a width or length to the layout: show what it comes to, and
+     lock the field until Fill is off again. */
+  function paintFill(s) {
+    [['~s.w', 'x', 'w'], ['~s.l', 'y', 'l']].forEach(function (a) {
+      var el = $('input[data-bind="' + a[0] + '"]');
+      if (!el) return;
+      var filled = s['align' + a[1].toUpperCase()] === 'stretch';
+      el.disabled = filled;
+      el.title = filled ? 'Set by Fill: the compartment takes the space its slot has. Turn Fill off to set it.' : '';
+      el.closest('label').classList.toggle('locked', filled);
+      if (filled && s._size && document.activeElement !== el) el.value = Math.round(s._size[a[2]] * 10) / 10;
+    });
+  }
+
   function onEdit(path, el) {
+    // Leaving Fill keeps the size it had, so nothing jumps.
+    if (path === '~s.alignX' || path === '~s.alignY') {
+      var sf = sectionNow(), ax = path === '~s.alignX' ? 'x' : 'y';
+      if (sf && sf._fill && sf._fill[ax] && sf['align' + ax.toUpperCase()] !== 'stretch' && sf._size) {
+        if (ax === 'x') sf.w = Math.round(sf._size.w * 10) / 10; else sf.l = Math.round(sf._size.l * 10) / 10;
+        sf._fill[ax] = false;
+      }
+    }
     if (path === '~s.item') {
       var sn = sectionNow();
       if (sn) { sn.shape = sn.item === 'round' ? 'round' : 'rect'; itemSig = ''; }

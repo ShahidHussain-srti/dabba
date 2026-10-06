@@ -209,6 +209,10 @@ window.CS = window.CS || {};
        but stays inside the outer wall, measured at the rim where the taper
        makes it widest. The allowed range rides along for the plan. */
     rects.forEach(function (r) {
+      // The object size it ends up with: what was asked for, or with Fill,
+      // whatever its slot gives it.
+      r.node._size = { w: CS.tidy(r.w - 2 * fit), l: CS.tidy(r.l - 2 * fit) };
+      r.node._fill = { x: r.node.alignX === 'stretch', y: r.node.alignY === 'stretch' };
       var m = r.node._margin || 0;
       var xr = [-IW / 2 + m - r.x0, IW / 2 - m - r.x1], yr = [-IL / 2 + m - r.y0, IL / 2 - m - r.y1];
       xr = [Math.min(xr[0], 0), Math.max(xr[1], 0)];

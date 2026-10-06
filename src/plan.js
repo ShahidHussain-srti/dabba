@@ -54,6 +54,21 @@ window.CS = window.CS || {};
     return e;
   };
 
+  /* 'right', 'back', or a corner like 'right-back' → { h: 'left'|'right'|null,
+     v: 'back'|'front'|null }. */
+  function sides(edge) {
+    var out = { h: null, v: null };
+    (edge || '').split('-').forEach(function (e) {
+      if (e === 'left' || e === 'right') out.h = e; else if (e === 'back' || e === 'front') out.v = e;
+    });
+    return out;
+  }
+  /* Fill hands an axis's size to the layout, so its edges are locked. */
+  function canResize(r, side) {
+    if (!CS.itemByKey(r.node.item).size) return false;
+    return side === 'left' || side === 'right' ? r.node.alignX !== 'stretch' : r.node.alignY !== 'stretch';
+  }
+
   function sx(t, x) { return t.ox + x * t.s; }
   function sy(t, y) { return t.oy - y * t.s; }
 
@@ -393,7 +408,7 @@ window.CS = window.CS || {};
     // A custom compartment being edited has its shape handles there instead.
     if (s.item === 'custom' && r.id === this.state.selected) return;
     var name = s.name || CS.layout.label(s, this.D.sections);
-    var l1 = CS.itemByKey(s.item).size ? fmt(s.w) + ' × ' + fmt(s.l) : CS.itemSummary(s);
+    var l1 = CS.itemByKey(s.item).size ? fmt(s._size ? s._size.w : s.w) + ' × ' + fmt(s._size ? s._size.l : s.l) : CS.itemSummary(s);
     var hh = s._shape ? s._shape.h : s.h;
     var l2 = 'h ' + fmt(hh) + (Math.abs(s._depth - hh) > 0.05 ? ' · depth ' + fmt(s._depth) : '');
     ctx.save();
@@ -431,7 +446,11 @@ window.CS = window.CS || {};
       ctx.stroke();
       ctx.restore();
 
-      if (hot && hov.edge) self._edgeGlow(ctx, t, r, hov.edge);
+      if (hot && hov.edge) {
+        var hs = sides(hov.edge);
+        if (hs.h) self._edgeGlow(ctx, t, r, hs.h);
+        if (hs.v) self._edgeGlow(ctx, t, r, hs.v);
+      }
     });
     var r = D.rects.filter(function (q) { return q.id === sel; })[0];
     if (!r) return;
@@ -439,13 +458,18 @@ window.CS = window.CS || {};
     // edge grips
     ctx.save();
     ctx.fillStyle = 'rgba(90,169,255,1)';
-    ['left', 'right', 'back', 'front'].forEach(function (e) {
+    ['left', 'right', 'back', 'front'].filter(function (e) { return canResize(r, e); }).forEach(function (e) {
       var g = self._grip(t, r, e);
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h, 2);
       else ctx.rect(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h);
       ctx.fill();
     });
+    if (canResize(r, 'left') && canResize(r, 'back')) {
+      [[r.x0, r.y1], [r.x1, r.y1], [r.x0, r.y0], [r.x1, r.y0]].forEach(function (c) {
+        ctx.fillRect(sx(t, c[0]) - 3.5, sy(t, c[1]) - 3.5, 7, 7);
+      });
+    }
     ctx.restore();
 
     this.buttons(t).forEach(function (b) {
@@ -478,14 +502,19 @@ window.CS = window.CS || {};
 
     // live dimensions while resizing
     if (this.drag && this.drag.kind === 'resize') {
-      var s = r.node, horiz = this.drag.edge === 'left' || this.drag.edge === 'right';
-      var txt = (horiz ? 'width ' + fmt(s.w) : 'length ' + fmt(s.l)) + ' mm';
+      var s = r.node, dd = this.drag, horiz = !!dd.h && !dd.v;
+      var txt = dd.h && dd.v ? fmt(s.w) + ' × ' + fmt(s.l) + ' mm'
+              : (dd.h ? 'width ' + fmt(s.w) : 'length ' + fmt(s.l)) + ' mm';
       ctx.save();
       ctx.font = '600 11px -apple-system,system-ui,sans-serif';
       var tw = ctx.measureText(txt).width + 14;
-      var gx = this._grip(t, r, this.drag.edge);
-      var bx = gx.x + (horiz ? (this.drag.edge === 'right' ? 14 : -14 - tw) : -tw / 2);
-      var by = gx.y + (horiz ? -10 : (this.drag.edge === 'back' ? -30 : 10));
+      var gx = dd.h && dd.v
+        ? { x: dd.h === 'right' ? sx(t, r.x1) : sx(t, r.x0), y: dd.v === 'back' ? sy(t, r.y1) : sy(t, r.y0) }
+        : this._grip(t, r, dd.h || dd.v);
+      var bx = dd.h && dd.v ? gx.x + (dd.h === 'right' ? 12 : -12 - tw)
+             : gx.x + (horiz ? (dd.h === 'right' ? 14 : -14 - tw) : -tw / 2);
+      var by = dd.h && dd.v ? gx.y + (dd.v === 'back' ? -28 : 8)
+             : gx.y + (horiz ? -10 : (dd.v === 'back' ? -30 : 10));
       ctx.fillStyle = 'rgba(43,111,209,0.95)';
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(bx, by, tw, 20, 10); else ctx.rect(bx, by, tw, 20);
@@ -785,7 +814,15 @@ window.CS = window.CS || {};
       cands.sort(function (a, b) { return a[1] - b[1]; });
       // Only a sized box / oval / capsule has edges to drag; other items take
       // their size from what they hold.
-      if (cands.length && cands[0][1] <= EDGE_PX && CS.itemByKey(r.node.item).size) return { id: r.id, edge: cands[0][0] };
+      // Corners resize both ways at once.
+      var CPX = EDGE_PX + 2;
+      var corners = [['left-back', x0, yT], ['right-back', x1, yT], ['left-front', x0, yB], ['right-front', x1, yB]];
+      for (var ci = 0; ci < corners.length; ci++) {
+        var cc = corners[ci], sd = sides(cc[0]);
+        if (Math.abs(x - cc[1]) <= CPX && Math.abs(y - cc[2]) <= CPX && canResize(r, sd.h) && canResize(r, sd.v)) return { id: r.id, edge: cc[0] };
+      }
+      cands = cands.filter(function (c) { return canResize(r, c[0]); });
+      if (cands.length && cands[0][1] <= EDGE_PX) return { id: r.id, edge: cands[0][0] };
     }
     // Bodies: the selected one first (it's drawn on top where they overlap),
     // then the rest, last drawn first.
@@ -820,6 +857,11 @@ window.CS = window.CS || {};
       var r = canvas.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
+    function edgeCursor(edge) {
+      var sd = sides(edge);
+      if (sd.h && sd.v) return (sd.h === 'right') === (sd.v === 'back') ? 'nesw-resize' : 'nwse-resize';
+      return sd.h ? 'ew-resize' : 'ns-resize';
+    }
     function cursorFor(h) {
       if (!h) return 'default';
       if (h.button) return 'pointer';
@@ -830,7 +872,7 @@ window.CS = window.CS || {};
       if (h.handle === 'rotate') return 'grab';
       if (h.prim != null) return 'move';
       if (h.body) return 'move';
-      if (h.edge) return (h.edge === 'left' || h.edge === 'right') ? 'ew-resize' : 'ns-resize';
+      if (h.edge) return edgeCursor(h.edge);
       if (h.id || h.panel) return 'pointer';
       return 'default';
     }
@@ -886,18 +928,15 @@ window.CS = window.CS || {};
         if (!found) return;
         var s = found.node, t = self.transform();
         var r = self.D.rects.filter(function (q) { return q.id === h.id; })[0];
-        var horiz = h.edge === 'left' || h.edge === 'right';
+        var sd = sides(h.edge);
         self.hooks.beginEdit();
-        // A stretched axis has no size of its own; resizing pins it again.
-        if (horiz && s.alignX === 'stretch') { s.w = Math.round((r.w - 2 * self.D.fit) * 10) / 10; s.alignX = 'center'; }
-        if (!horiz && s.alignY === 'stretch') { s.l = Math.round((r.l - 2 * self.D.fit) * 10) / 10; s.alignY = 'center'; }
         self.frozen = { s: t.s, ox: t.ox, oy: t.oy };
         self.drag = {
-          kind: 'resize', id: h.id, edge: h.edge, x: p.x, y: p.y,
-          start: horiz ? s.w : s.l,
-          // Hold the opposite edge still on screen while the layout reflows.
-          anchor: h.edge === 'right' ? sx(t, r.x0) : h.edge === 'left' ? sx(t, r.x1)
-                : h.edge === 'back' ? sy(t, r.y0) : sy(t, r.y1)
+          kind: 'resize', id: h.id, edge: h.edge, h: sd.h, v: sd.v, x: p.x, y: p.y,
+          w0: s.w, l0: s.l,
+          // Hold the opposite edges still on screen while the layout reflows.
+          ax: sd.h === 'right' ? sx(t, r.x0) : sd.h === 'left' ? sx(t, r.x1) : null,
+          ay: sd.v === 'back' ? sy(t, r.y0) : sd.v === 'front' ? sy(t, r.y1) : null
         };
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
@@ -913,21 +952,19 @@ window.CS = window.CS || {};
         var found = CS.layout.find(self.state.layout, d.id);
         if (!found) return;
         var s = found.node;
-        var mmDelta = (d.edge === 'left' || d.edge === 'right') ? (p.x - d.x) / t.s : -(p.y - d.y) / t.s;
-        var sign = (d.edge === 'right' || d.edge === 'back') ? 1 : -1;
         var step = e.shiftKey ? 0.1 : 0.5;
-        var v = Math.max(2, Math.round((d.start + sign * mmDelta) / step) * step);
-        v = Math.round(v * 10) / 10;
-        if (d.edge === 'left' || d.edge === 'right') s.w = v; else s.l = v;
+        var size = function (start, delta) { return Math.round(Math.max(2, Math.round((start + delta) / step) * step) * 10) / 10; };
+        if (d.h) s.w = size(d.w0, (d.h === 'right' ? 1 : -1) * (p.x - d.x) / t.s);
+        if (d.v) s.l = size(d.l0, (d.v === 'back' ? 1 : -1) * -(p.y - d.y) / t.s);
         self.describe();
         var r = self.D.rects.filter(function (q) { return q.id === d.id; })[0];
         if (r) {
-          if (d.edge === 'right') self.frozen.ox = d.anchor - r.x0 * t.s;
-          if (d.edge === 'left') self.frozen.ox = d.anchor - r.x1 * t.s;
-          if (d.edge === 'back') self.frozen.oy = d.anchor + r.y0 * t.s;
-          if (d.edge === 'front') self.frozen.oy = d.anchor + r.y1 * t.s;
+          if (d.h === 'right') self.frozen.ox = d.ax - r.x0 * t.s;
+          if (d.h === 'left') self.frozen.ox = d.ax - r.x1 * t.s;
+          if (d.v === 'back') self.frozen.oy = d.ay + r.y0 * t.s;
+          if (d.v === 'front') self.frozen.oy = d.ay + r.y1 * t.s;
         }
-        canvas.style.cursor = (d.edge === 'left' || d.edge === 'right') ? 'ew-resize' : 'ns-resize';
+        canvas.style.cursor = edgeCursor(d.edge);
         self.draw();
         self.hooks.change(true);
         return;
