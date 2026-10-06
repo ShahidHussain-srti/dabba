@@ -577,6 +577,13 @@
     $$('[data-add]').forEach(function (b) {
       b.addEventListener('click', function () { addSection(b.dataset.add, addWhole); });
     });
+    $('#btn-pocket-all').addEventListener('click', function () {
+      var s = sectionNow();
+      if (!s) return;
+      beginEdit(0);
+      CS.layout.sections(state.layout).forEach(function (o) { o.pocket = Object.assign({}, s.pocket); });
+      refreshValues(); apply();
+    });
     $('#btn-recentre').addEventListener('click', function () {
       var s = sectionNow();
       if (!s || (!s.dx && !s.dy)) return;
@@ -1171,6 +1178,8 @@
         out.grooves = Object.assign(CS.newSection().grooves, n.grooves || {});
         out.groove = Object.assign(CS.newSection().groove, n.groove || {});
         if (!n.item) out.item = n.shape === 'round' ? 'round' : 'box';   // saved before item shapes
+        // Saved when pocket shape was one setting for the whole case.
+        out.pocket = Object.assign({}, CS.newSection().pocket, ps.pocket || {}, n.pocket || {});
         if (!out.params || typeof out.params !== 'object') out.params = {};
         if (!Array.isArray(out.prims)) out.prims = [];
         if (!out.id) out.id = WB.newId('s');

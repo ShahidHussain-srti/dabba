@@ -238,7 +238,7 @@ window.CS = window.CS || {};
       ctx.beginPath();
       ctx.ellipse(sx(t, r.cx), sy(t, r.cy), r.w / 2 * t.s, r.l / 2 * t.s, 0, 0, Math.PI * 2);
     } else {
-      rrPath(ctx, t, r.cx, r.cy, r.w, r.l, Math.min(this.state.pocket.corner, Math.min(r.w, r.l) / 2));
+      rrPath(ctx, t, r.cx, r.cy, r.w, r.l, Math.min((r.node._P || this.state.pocket).corner, Math.min(r.w, r.l) / 2));
     }
   };
 

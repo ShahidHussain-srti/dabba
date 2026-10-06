@@ -46,7 +46,7 @@ window.CS = window.CS || {};
     var hit = L.find(root, id);
     if (!hit || hit.node.kind !== 'section') return { root: root, id: null };
     var s = hit.node, dir = AXIS[side];
-    var fresh = CS.newSection({ w: s.w, l: s.l, h: s.h, shape: s.shape });
+    var fresh = CS.newSection({ w: s.w, l: s.l, h: s.h, shape: s.shape, pocket: Object.assign({}, s.pocket) });
 
     if (hit.parent && hit.parent.dir === dir) {
       hit.parent.children.splice(hit.index + (BEFORE[side] ? 0 : 1), 0, fresh);
@@ -63,7 +63,8 @@ window.CS = window.CS || {};
      everything that's there now. `like` is copied for its size. */
   L.addAtSide = function (root, side, like) {
     var dir = AXIS[side];
-    var fresh = CS.newSection(like ? { w: like.w, l: like.l, h: like.h, shape: like.shape } : {});
+    var fresh = CS.newSection(like ? { w: like.w, l: like.l, h: like.h, shape: like.shape,
+                                       pocket: Object.assign({}, like.pocket) } : {});
     if (root.kind === 'split' && root.dir === dir) {
       if (BEFORE[side]) root.children.unshift(fresh); else root.children.push(fresh);
       return { root: root, id: fresh.id };
@@ -140,7 +141,12 @@ window.CS = window.CS || {};
     var top = tray ? 0 : snap(Math.max(Wl.top, lh * 2), 'up');
     var zP = CS.tidy(bottom + Hb), zT = CS.tidy(zP + Ht + top);
 
-    var tanP = Math.tan(WB.clamp(P.taper, 0, 20) * Math.PI / 180);
+    // Each pocket has its own shape; anything missing falls back to the defaults.
+    secs.forEach(function (s) {
+      s._P = Object.assign({}, P, s.pocket || {});
+      s._tanP = Math.tan(WB.clamp(+s._P.taper || 0, 0, 20) * Math.PI / 180);
+    });
+    var tanP = Math.max.apply(null, secs.map(function (s) { return s._tanP; }).concat([0]));
     var depthMax = 0;
     secs.forEach(function (s) {
       var d;
@@ -155,7 +161,7 @@ window.CS = window.CS || {};
         q._depth = q.depth != null && isFinite(q.depth) ? WB.clamp(snap(q.depth), lh, Hb) : s._depth;
         if (q._depth > depthMax) depthMax = q._depth;
       });
-      s._margin = s._depth * tanP;          // the taper widens the cavity this much at the rim
+      s._margin = s._depth * s._tanP;       // the taper widens the cavity this much at the rim
       s._cw = sh.w;
       s._cl = sh.l;
       if (s._depth > depthMax) depthMax = s._depth;

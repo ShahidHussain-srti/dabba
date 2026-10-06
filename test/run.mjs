@@ -36,7 +36,7 @@ function variants() {
 
   const s3 = CS.defaults();
   s3.hinge.side = 'left'; s3.clasp.type = 'bump'; s3.clasp.count = 3; s3.split = 0.35;
-  s3.outer.taper = 3; s3.pocket.taper = 4; s3.outer.edgeStyle = 'chamfer';
+  s3.outer.taper = 3; CS.layout.sections(s3.layout).forEach(sec => { sec.pocket.taper = 4; }); s3.outer.edgeStyle = 'chamfer';
   out.push(['hinge on left, bumps, tapers, chamfers, 35/65 split', s3]);
 
   const s4 = CS.defaults();
@@ -311,6 +311,21 @@ console.log('moving and adding');
     check('adding along the whole ' + side + ' side spans it', CS.layout.sections(a.layout).length === before + 1 &&
           Math.abs(across - full) < 1e-6 && Math.abs(edge) < 1e-6, 'span ' + across.toFixed(2) + '/' + full.toFixed(2) + ', edge ' + edge.toFixed(3));
   }
+}
+
+console.log('pocket shape per compartment');
+{
+  const s = CS.defaults(), secs = CS.layout.sections(s.layout);
+  secs[0].pocket.taper = 8; secs[0].pocket.corner = 6;
+  const D = CS.resolve(s);
+  const [a, b] = [D.rects.find(r => r.id === secs[0].id), D.rects.find(r => r.id === secs[1].id)];
+  check('taper widens only its own pocket', a.node._margin > 0.5 && b.node._margin === 0, a.node._margin.toFixed(3) + ' / ' + b.node._margin);
+  check('each pocket keeps its own corner radius', a.node._P.corner === 6 && b.node._P.corner === 1.5);
+  const m = CS.buildModel(s, { decor: false });
+  check('mixed pocket shapes build a valid case', m.parts.every(p => { const t = toManifold(wasm, p); const ok = t.status() === 'NoError' && !t.isEmpty(); t.delete(); return ok; }));
+  const fresh = CS.layout.addNeighbor(s.layout, secs[0].id, 'right');
+  const added = CS.layout.find(fresh.root, fresh.id).node;
+  check('a new compartment copies the pocket shape it was added from', added.pocket.taper === 8 && added.pocket !== secs[0].pocket);
 }
 
 console.log('export');

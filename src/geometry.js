@@ -372,7 +372,7 @@ window.CS = window.CS || {};
     /* Finger notches, one per requested side of each compartment. */
     D.notches = [];
     D.rects.forEach(function (r) {
-      var s = r.node, gTop = s._depth * D.tanP;
+      var s = r.node, gTop = s._depth * s._tanP;
       var dg = s.groove.depth != null && isFinite(s.groove.depth)
         ? WB.clamp(s.groove.depth, 1, D.Hb) : Math.max(1, s._depth * 0.7);
       var sides = s.grooves || {};
@@ -432,6 +432,8 @@ window.CS = window.CS || {};
   /* ── pockets ────────────────────────────────────────────────────── */
   function pocket(S, D, P, r, zTop, clip) {
     var s = r.node, d = r.depth != null ? r.depth : s._depth, zf = D.zP - d;
+    P = s._P || P;                          // this compartment's own pocket shape
+    var tanP = s._tanP != null ? s._tanP : D.tanP;
     var round = (r.shape || s.shape) === 'round';
     var rf = Math.max(0, Math.min(P.floor, d * 0.45, Math.min(r.w, r.l) / 2 - 0.2));
     var rr = Math.max(0, Math.min(P.rim, D.inner / 2 - 0.3, d * 0.35, d - rf - 0.2));
@@ -439,7 +441,7 @@ window.CS = window.CS || {};
     var seg = D.seg;
 
     var ring = function (z, off) {          // off > 0 grows the outline
-      var g = (Math.min(z, D.zP) - zf) * D.tanP + off;
+      var g = (Math.min(z, D.zP) - zf) * tanP + off;
       var pts = round
         ? ellipse(r.w / 2 + g, r.l / 2 + g, r.cx, r.cy, seg)
         : rrect(r.w + 2 * g, r.l + 2 * g, Math.max(0, rc + g), r.cx, r.cy, seg);
@@ -1023,7 +1025,7 @@ window.CS = window.CS || {};
     var keep = D.lipOn ? D.lipC + D.lipH * D.lipH / (2 * r) : 0.1;
     var filler = inter(S, prism(S, [interiorRing(D, keep)], D.zP + gap, D.zP + D.Ht + 0.05), lidShell);
     var pockets = D.rects.map(function (rc) {
-      var s = rc.node, gTop = s._depth * D.tanP;
+      var s = rc.node, gTop = s._depth * s._tanP;
       var dl = D.Ht + 1;
       if (LI.depth === 'fit') {
         var up = Math.max(0, s.h - s._depth) + Math.max(0.3, state.headroom);
@@ -1033,11 +1035,11 @@ window.CS = window.CS || {};
       var ring = function (z, g) {
         var pts = s.shape === 'round'
           ? ellipse(rc.w / 2 + g, rc.l / 2 + g, rc.cx, rc.cy, D.seg)
-          : rrect(rc.w + 2 * g, rc.l + 2 * g, Math.max(0, Math.min(state.pocket.corner, Math.min(rc.w, rc.l) / 2) + g), rc.cx, rc.cy, D.seg);
+          : rrect(rc.w + 2 * g, rc.l + 2 * g, Math.max(0, Math.min(s._P.corner, Math.min(rc.w, rc.l) / 2) + g), rc.cx, rc.cy, D.seg);
         return lift(pts, z);
       };
       // Matches the base pocket at the rim and keeps its taper going.
-      return loft(S, [ring(D.zP - 1, gTop), ring(D.zP + dl, Math.max(0, gTop - dl * D.tanP))], true);
+      return loft(S, [ring(D.zP - 1, gTop), ring(D.zP + dl, Math.max(0, gTop - dl * s._tanP))], true);
     });
     D.lidGap = gap;
     return union(S, [lid, sub(S, filler, union(S, pockets))]);
@@ -1474,8 +1476,9 @@ window.CS = window.CS || {};
     if (D.bottom < 1.2 || (!D.tray && D.top < 1.2)) {
       warn.push({ level: 'warn', msg: 'A floor or lid top under 1.2 mm is thin enough to flex and show the infill through it.' });
     }
-    if (state.pocket.taper > 0 && D.depthMax > 0) {
-      warn.push({ level: 'ok', msg: 'Pockets widen by ' + (D.depthMax * D.tanP).toFixed(2) +
+    var widest = Math.max.apply(null, D.rects.map(function (r) { return r.node._margin || 0; }).concat([0]));
+    if (widest > 0.005) {
+      warn.push({ level: 'ok', msg: 'Tapered pockets widen by up to ' + widest.toFixed(2) +
         ' mm per side towards the rim; inner walls were spaced to keep their minimum at the top.' });
     }
 

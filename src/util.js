@@ -31,6 +31,7 @@ window.CS = window.CS || {};
       item: 'box', params: {}, prims: [],      // what it holds: see items.js
       alignX: 'center', alignY: 'center',
       dx: 0, dy: 0,                            // dragged off its place in the layout, mm
+      pocket: { corner: 1.5, floor: 0.8, rim: 0.6, taper: 0 },   // this pocket's shape
       grooves: { left: false, right: false, front: false, back: false },
       groove: { width: 18, depth: null }
     }, opts || {});

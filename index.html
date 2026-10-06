@@ -95,6 +95,16 @@
             </div>
           </div>
           <p class="hint" id="sec-depth-hint"></p>
+          <h3>Pocket shape</h3>
+          <div class="row num" data-num="~s.pocket.corner" data-min="0" data-max="20" data-step="0.25" data-unit="mm">Corner radius</div>
+          <div class="row num" data-num="~s.pocket.floor" data-min="0" data-max="10" data-step="0.1" data-unit="mm">Floor rounding</div>
+          <div class="row num" data-num="~s.pocket.rim" data-min="0" data-max="5" data-step="0.1" data-unit="mm">Rim round-over</div>
+          <div class="row num" data-num="~s.pocket.taper" data-min="0" data-max="15" data-step="0.5" data-unit="°">Taper</div>
+          <div class="row inlinerow">
+            <button class="ghost" id="btn-pocket-all" title="Give every compartment this pocket shape">Use for all compartments</button>
+          </div>
+          <p class="hint">Taper widens the pocket towards the rim so the object lifts out easily; walls are spaced so
+            their thinnest point, at the top, still meets the inner-wall setting.</p>
           <div class="row">
             <span class="lbl">Sideways in its slot</span>
             <div class="seg small full" role="group" aria-label="Horizontal alignment" data-bind="~s.alignX">
@@ -217,13 +227,8 @@
         </div>
         <div class="row num" data-num="outer.taper" data-min="0" data-max="12" data-step="0.5" data-unit="°" data-hide="gridfinity.enabled:true">Wall taper</div>
         <p class="hint">Taper leans the outside in towards the top and bottom; the parting line stays the widest point.</p>
-        <h3>Pockets</h3>
-        <div class="row num" data-num="pocket.corner" data-min="0" data-max="20" data-step="0.25" data-unit="mm">Corner radius</div>
-        <div class="row num" data-num="pocket.floor" data-min="0" data-max="10" data-step="0.1" data-unit="mm">Floor rounding</div>
-        <div class="row num" data-num="pocket.rim" data-min="0" data-max="5" data-step="0.1" data-unit="mm">Rim round-over</div>
-        <div class="row num" data-num="pocket.taper" data-min="0" data-max="15" data-step="0.5" data-unit="°">Pocket taper</div>
-        <p class="hint">Pocket taper widens each pocket towards the rim so objects lift out easily; walls are spaced
-          so their thinnest point, at the top, still meets the inner-wall setting.</p>
+        <p class="hint">Each pocket's corners, floor, rim and taper are set with the compartment, under
+          Compartments.</p>
       </div>
     </section>
 
