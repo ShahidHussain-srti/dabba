@@ -15,7 +15,7 @@ window.CS = window.CS || {};
   var TAU = Math.PI * 2;
   function frac(v) { return v - Math.floor(v); }
   function tri(v) { return 1 - Math.abs(2 * frac(v) - 1); }          // 0 on integers, 1 halfway
-  function sstep(a, b, x) { var t = CS.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+  function sstep(a, b, x) { var t = WB.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 
   function hash(ix, iy) {
     var h = (ix * 374761393 + iy * 668265263) | 0;
@@ -142,7 +142,7 @@ window.CS = window.CS || {};
       return r > 0.5 ? 0 : (0.5 + 0.5 * Math.cos(TAU * r * 3)) * (1 - sstep(0.4, 0.5, r));
     },
     checker: function (x, y) {
-      var a = CS.clamp(Math.sin(Math.PI * x) * 3, -1, 1), b = CS.clamp(Math.sin(Math.PI * y) * 3, -1, 1);
+      var a = WB.clamp(Math.sin(Math.PI * x) * 3, -1, 1), b = WB.clamp(Math.sin(Math.PI * y) * 3, -1, 1);
       return 0.5 - 0.5 * a * b;
     },
     wood: function (x, y, W) {
@@ -172,7 +172,7 @@ window.CS = window.CS || {};
     },
     crystal: function (x, y, W) {
       var q = wf(1, W), w = worley(x * q[0], y, q[1]);
-      return CS.clamp(w[0] * 1.6, 0, 1);
+      return WB.clamp(w[0] * 1.6, 0, 1);
     },
     /* 2:1 planks, alternately lying and standing, on the lattice spanned by
        (1, 1) and (2, -2) in plank units: lying plank [0,2]×[0,1], standing
@@ -243,7 +243,7 @@ window.CS = window.CS || {};
     var rotated = Math.abs(angle || 0) >= 0.01;
     if (!period) {
       return function (u, v) {
-        return CS.clamp(rotated ? f((u * c - v * sn) / s, (u * sn + v * c) / s, 0) : f(u / s, v / s, 0), 0, 1);
+        return WB.clamp(rotated ? f((u * c - v * sn) / s, (u * sn + v * c) / s, 0) : f(u / s, v / s, 0), 0, 1);
       };
     }
     var off = seamAt || 0, per = PERIOD[name], su = s, W = 0;
@@ -268,7 +268,7 @@ window.CS = window.CS || {};
         t = t * t * (3 - 2 * t);
         val = val * (1 - t) + at(uu - period, v) * t;
       }
-      return CS.clamp(val, 0, 1);
+      return WB.clamp(val, 0, 1);
     };
   };
 

@@ -121,25 +121,25 @@ window.CS = window.CS || {};
 
     // A tray is the base on its own: the whole interior is in it.
     var tray = state.build === 'tray';
-    var Hb = tray ? Hi : CS.clamp(snap(Hi * state.split), lh * 2, Hi - lh * 2);
+    var Hb = tray ? Hi : WB.clamp(snap(Hi * state.split), lh * 2, Hi - lh * 2);
     var Ht = CS.tidy(Hi - Hb);
     var bottom = snap(Math.max(Wl.bottom, lh * 2), 'up');
     var top = tray ? 0 : snap(Math.max(Wl.top, lh * 2), 'up');
     var zP = CS.tidy(bottom + Hb), zT = CS.tidy(zP + Ht + top);
 
-    var tanP = Math.tan(CS.clamp(P.taper, 0, 20) * Math.PI / 180);
+    var tanP = Math.tan(WB.clamp(P.taper, 0, 20) * Math.PI / 180);
     var depthMax = 0;
     secs.forEach(function (s) {
       var d;
       var sh = s._shape;
-      if (s.depth != null && isFinite(s.depth)) d = CS.clamp(snap(s.depth), lh, Hb);
+      if (s.depth != null && isFinite(s.depth)) d = WB.clamp(snap(s.depth), lh, Hb);
       else if (state.seat === 'flush') d = Math.min(snap(sh.h), Hb);
       else d = Hb;
       s._depth = CS.tidy(d);
       // Shapes with their own hold depth (bits, standing batteries) may go no
       // deeper than the base allows.
       sh.prims.forEach(function (q) {
-        q._depth = q.depth != null && isFinite(q.depth) ? CS.clamp(snap(q.depth), lh, Hb) : s._depth;
+        q._depth = q.depth != null && isFinite(q.depth) ? WB.clamp(snap(q.depth), lh, Hb) : s._depth;
         if (q._depth > depthMax) depthMax = q._depth;
       });
       s._margin = s._depth * tanP;          // the taper widens the cavity this much at the rim
@@ -164,7 +164,7 @@ window.CS = window.CS || {};
        is thinnest at the deepest pocket floor. Grow the box until that point is
        still a full side wall thick. Gridfinity bins stand straight. */
     var gf = state.gridfinity && state.gridfinity.enabled;
-    var tanO = gf ? 0 : Math.tan(CS.clamp(O.taper, 0, 15) * Math.PI / 180);
+    var tanO = gf ? 0 : Math.tan(WB.clamp(O.taper, 0, 15) * Math.PI / 180);
     var grow = depthMax * tanO;
     var T0 = Math.max(0.8, Wl.side) + grow;     // wall thickness at the parting line
     var W = IW + 2 * T0, Ld = IL + 2 * T0;
@@ -185,9 +185,9 @@ window.CS = window.CS || {};
     var rects = [];
     place(root, -IW / 2, IL / 2, IW, IL, inner, rects);
 
-    var R = CS.clamp(O.corner, 0, Math.min(W, Ld) / 2 - 0.01);
-    var eb = gf ? 0 : CS.clamp(O.edgeBottom, 0, Math.min(zP * 0.5, 2 * Math.min(bottom, T0)));
-    var et = tray ? 0 : CS.clamp(O.edgeTop, 0, Math.min((zT - zP) * 0.5, 2 * Math.min(top, T0)));
+    var R = WB.clamp(O.corner, 0, Math.min(W, Ld) / 2 - 0.01);
+    var eb = gf ? 0 : WB.clamp(O.edgeBottom, 0, Math.min(zP * 0.5, 2 * Math.min(bottom, T0)));
+    var et = tray ? 0 : WB.clamp(O.edgeTop, 0, Math.min((zT - zP) * 0.5, 2 * Math.min(top, T0)));
     if ((!gf && O.edgeBottom > eb + 1e-6) || (!tray && O.edgeTop > et + 1e-6)) {
       warn.push({ level: 'warn', msg: 'Edge rounding was limited to ' + eb.toFixed(1) + ' mm (base) / ' + et.toFixed(1) +
         ' mm (lid) so it cannot break through the walls. Thicker walls allow more.' });
@@ -196,8 +196,8 @@ window.CS = window.CS || {};
     var ls = state.lip.sides || {};
     var lipSides = { back: ls.back !== false, front: ls.front !== false, left: ls.left !== false, right: ls.right !== false };
     var lipOn = !tray && !!state.lip.enabled && (lipSides.back || lipSides.front || lipSides.left || lipSides.right);
-    var lipC = CS.clamp(state.lip.clearance, 0, 0.8);
-    var lipH = lipOn ? CS.clamp(snap(state.lip.height), lh * 2, Math.max(lh * 2, Ht - lipC - lh)) : 0;
+    var lipC = WB.clamp(state.lip.clearance, 0, 0.8);
+    var lipH = lipOn ? WB.clamp(snap(state.lip.height), lh * 2, Math.max(lh * 2, Ht - lipC - lh)) : 0;
     var lipT = T0 / 2 - lipC / 2;
     if (lipOn && lipT < 0.8) {
       warn.push({ level: 'bad', msg: 'The alignment lip is only ' + lipT.toFixed(2) + ' mm thick. Use side walls of at least ' +

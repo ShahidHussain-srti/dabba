@@ -13,6 +13,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export async function load(files) {
   globalThis.window = globalThis;
+  vm.runInThisContext(readFileSync(join(root, 'vendor/workbench/workbench.js'), 'utf8'), { filename: 'workbench.js' });
   for (const f of files) vm.runInThisContext(readFileSync(join(root, 'src', f), 'utf8'), { filename: f });
   const wasm = await Module();
   wasm.setup();

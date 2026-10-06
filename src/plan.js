@@ -37,7 +37,7 @@ window.CS = window.CS || {};
     // Room for the badge on top, the dimension lines and the + buttons around.
     var pad = Math.min(56, W * 0.12, H * 0.12), top = 40, side = 34;
     var s = Math.min((W - pad * 2 - side) / Math.max(ext.w, 1), (H - pad * 2 - top - side) / Math.max(ext.h, 1));
-    s = CS.clamp(s, 0.2, 30);
+    s = WB.clamp(s, 0.2, 30);
     var cx = (ext.x0 + ext.x1) / 2, cy = (ext.y0 + ext.y1) / 2;
     void D;
     return { s: s, ox: W / 2 + side / 2 - cx * s, oy: (H + top - side) / 2 + cy * s };
@@ -58,13 +58,13 @@ window.CS = window.CS || {};
   function sy(t, y) { return t.oy - y * t.s; }
 
   function shade(hex, k) {
-    var c = CS.hexToRgb(hex);
-    var f = function (v) { return Math.round(CS.clamp(v, 0, 1) * 255); };
+    var c = WB.hexToRgb(hex);
+    var f = function (v) { return Math.round(WB.clamp(v, 0, 1) * 255); };
     return 'rgb(' + f(c[0] * (1 - k)) + ',' + f(c[1] * (1 - k)) + ',' + f(c[2] * (1 - k)) + ')';
   }
   function tint(hex, k) {
-    var c = CS.hexToRgb(hex);
-    var f = function (v) { return Math.round(CS.clamp(v + (1 - v) * k, 0, 1) * 255); };
+    var c = WB.hexToRgb(hex);
+    var f = function (v) { return Math.round(WB.clamp(v + (1 - v) * k, 0, 1) * 255); };
     return 'rgb(' + f(c[0]) + ',' + f(c[1]) + ',' + f(c[2]) + ')';
   }
 
@@ -400,7 +400,7 @@ window.CS = window.CS || {};
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    var big = CS.clamp(Math.min(w / 9, h / 4.2), 9, 13);
+    var big = WB.clamp(Math.min(w / 9, h / 4.2), 9, 13);
     var cx = sx(t, r.cx), cy = sy(t, r.cy);
     var lines = h > 52 ? [name, l1, l2] : h > 34 ? [name, l1] : [l1];
     var y0 = cy - (lines.length - 1) * big * 0.62;

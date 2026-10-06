@@ -226,7 +226,7 @@ window.CS = window.CS || {};
         self.pan[1] += (-c * dx - s * dy) * k;
       } else {
         self.az -= dx * 0.008;
-        self.el = CS.clamp(self.el + dy * 0.008, -1.5, 1.5);
+        self.el = WB.clamp(self.el + dy * 0.008, -1.5, 1.5);
       }
       self.draw();
     });
@@ -242,7 +242,7 @@ window.CS = window.CS || {};
     canvas.addEventListener('pointercancel', end);
     canvas.addEventListener('wheel', function (e) {
       e.preventDefault();
-      self.dist = CS.clamp(self.dist * Math.exp(e.deltaY * 0.0012), self.radius * 0.55, self.radius * 14);
+      self.dist = WB.clamp(self.dist * Math.exp(e.deltaY * 0.0012), self.radius * 0.55, self.radius * 14);
       self.draw();
     }, { passive: false });
     canvas.addEventListener('dblclick', function () { self.frame(); self.draw(); });
@@ -345,7 +345,7 @@ window.CS = window.CS || {};
 
     parts.forEach(function (part) {
       var pose = self.D ? CS.poseFor(self.D, part, self.mode, self.angle) : null;
-      var rgb = CS.hexToRgb(part.color);
+      var rgb = WB.hexToRgb(part.color);
       var p = part.positions, ix = part.indices, cn = cornerNormals(part), tx = part.tex;
       // Poses are rigid, so a direction turns with the point it sits on.
       var turn = function (q, x0, y0, z0, vx, vy, vz) {

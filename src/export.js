@@ -238,7 +238,7 @@ window.CS = window.CS || {};
       '</Relationships>';
 
     var enc = new TextEncoder();
-    return CS.zip([
+    return WB.zip([
       { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
       { name: '_rels/.rels',         data: enc.encode(rels) },
       { name: '3D/3dmodel.model',    data: enc.encode(xml.join('\n')) },

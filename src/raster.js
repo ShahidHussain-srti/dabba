@@ -16,7 +16,7 @@ window.CS = window.CS || {};
   CS.gridTransform = gridTransform;
 
   function ctxFor(key, g) {
-    var c = CS.scratch(key, g.cols, g.rows);
+    var c = WB.scratch(key, g.cols, g.rows);
     var ctx = c.getContext('2d', { willReadFrequently: true });
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, g.cols, g.rows);
@@ -27,7 +27,7 @@ window.CS = window.CS || {};
      The flat part of a decorated face, as a rounded rectangle. `fo` comes from
      CS.faceOutline: {w, h, r} in mm, centred on the face. */
   CS.drawFace = function (ctx, fo, t) {
-    CS.shapePath(ctx, 'rect', fo.w, fo.h, fo.r, t);
+    WB.shapePath(ctx, 'rect', fo.w, fo.h, fo.r, t);
   };
 
   CS.faceMask = function (fo, g) {
@@ -36,7 +36,7 @@ window.CS = window.CS || {};
     o.ctx.beginPath();
     CS.drawFace(o.ctx, fo, gridTransform(g));
     o.ctx.fill();
-    return CS.mask.sealEdges(CS.mask.fromCanvas(o.canvas), g);
+    return WB.mask.sealEdges(WB.mask.fromCanvas(o.canvas), g);
   };
 
   /* Every element on one face, colour-separated and clipped to the flat area.
@@ -53,21 +53,21 @@ window.CS = window.CS || {};
       else if (e.kind === 'text') m = CS.textMask(e.item, g);
       else m = CS.artMask(e.item, g);
       if (!m) return;
-      if (mirror) m = CS.mirrorMaskX(m, g);
+      if (mirror) m = WB.mirrorMaskX(m, g);
       out.raw.push({ kind: e.kind, index: e.index, mask: m });
       out.list.push({ kind: e.kind, index: e.index, item: e.item,
-                      color: e.item.color, mask: CS.mask.and(m, plate) });
+                      color: e.item.color, mask: WB.mask.and(m, plate) });
     });
 
     /* Topmost wins: walk down the stack subtracting everything above. */
     var claimed = null;
     for (var i = out.list.length - 1; i >= 0; i--) {
       var full = out.list[i].mask;
-      out.list[i].mask = CS.mask.sub(full, claimed);
-      claimed = CS.mask.union(claimed, full);
+      out.list[i].mask = WB.mask.sub(full, claimed);
+      claimed = WB.mask.union(claimed, full);
     }
-    out.list = out.list.filter(function (e) { return e.mask && !CS.mask.empty(e.mask); });
-    out.list.forEach(function (e) { out.all = CS.mask.union(out.all, e.mask); });
+    out.list = out.list.filter(function (e) { return e.mask && !WB.mask.empty(e.mask); });
+    out.list.forEach(function (e) { out.all = WB.mask.union(out.all, e.mask); });
     return out;
   };
 
@@ -138,9 +138,9 @@ window.CS = window.CS || {};
   /* Trace the isoline of a signed distance field at `dist` mm inside. */
   function isoline(d, g, dist) {
     var m = new Float32Array(d.length), aa = 1 / g.ppmm;
-    for (var i = 0; i < d.length; i++) m[i] = CS.clamp((d[i] - dist) / aa + 0.5, 0, 1);
-    CS.mask.sealEdges(m, g);
-    return CS.contours(m, g, { eps: 0.3 / g.ppmm, minArea: 0.4 });
+    for (var i = 0; i < d.length; i++) m[i] = WB.clamp((d[i] - dist) / aa + 0.5, 0, 1);
+    WB.mask.sealEdges(m, g);
+    return WB.contours(m, g, { eps: 0.3 / g.ppmm, minArea: 0.4 });
   }
 
   function ringPerimeter(r) {
@@ -282,7 +282,7 @@ window.CS = window.CS || {};
       });
     });
 
-    return CS.mask.sealEdges(CS.mask.fromCanvas(o.canvas), g);
+    return WB.mask.sealEdges(WB.mask.fromCanvas(o.canvas), g);
   }
 
   CS.borderMask = function (b, fo, g, plate) {
@@ -299,13 +299,13 @@ window.CS = window.CS || {};
       var o = ctxFor('bshape', g);
       o.ctx.fillStyle = '#fff';
       o.ctx.beginPath();
-      CS.shapePath(o.ctx, b.shape, w, h, b.radius, gridTransform(g));
+      WB.shapePath(o.ctx, b.shape, w, h, b.radius, gridTransform(g));
       o.ctx.fill();
-      src = CS.mask.sealEdges(CS.mask.fromCanvas(o.canvas), g);
+      src = WB.mask.sealEdges(WB.mask.fromCanvas(o.canvas), g);
       centred = true;     // bands straddle the outline instead of insetting
     }
 
-    var d = CS.sdf(src, g);
+    var d = WB.sdf(src, g);
 
     if (STROKED[b.style]) {
       // centreline sits half a line width inside the nominal inset, plus the
@@ -322,7 +322,7 @@ window.CS = window.CS || {};
       for (var k = 0; k < bands.length; k++) {
         var lo = bands[k][0], hi = bands[k][1];
         if (centred) { lo = Math.max(0, lo - b.inset); hi = hi - b.inset; }
-        var t = CS.band(dv, lo, hi, aa);
+        var t = WB.band(dv, lo, hi, aa);
         if (t > v) v = t;
       }
       out[i] = v;
@@ -346,7 +346,7 @@ window.CS = window.CS || {};
 
     var lines = content.split('\n');
     var font = (tx.italic ? 'italic ' : '') + (tx.bold ? '700 ' : '400 ') + px + 'px ' +
-               CS.fontByKey(CS.fontKey(tx.font)).css;
+               WB.fontByKey(WB.fontKey(tx.font)).css;
     var track = tx.tracking * t.s;
     var lh = px * tx.lineHeight;
 
@@ -436,7 +436,7 @@ window.CS = window.CS || {};
     var o = ctxFor('text', g);
     var ok = CS.drawText(o.ctx, tx, gridTransform(g), { fill: '#fff' });
     if (!ok) return null;
-    return CS.mask.sealEdges(CS.mask.fromCanvas(o.canvas), g);
+    return WB.mask.sealEdges(WB.mask.fromCanvas(o.canvas), g);
   };
 
   /* ── picture / drawing ──────────────────────────────────────────── */
@@ -444,7 +444,7 @@ window.CS = window.CS || {};
   CS.artPlacement = function (art, t) {
     var src = CS.artBitmap(art);
     if (!src) return null;
-    if (src._bbox === undefined) src._bbox = CS.contentBBox(src);
+    if (src._bbox === undefined) src._bbox = WB.contentBBox(src);
     var bb = src._bbox;
     if (!bb) return null;
     var k = art.size * t.s / Math.max(bb.w, bb.h);
@@ -504,10 +504,10 @@ window.CS = window.CS || {};
         if (a <= 0.004) { out[j] = 0; continue; }
         var lum = (0.2126 * img[j * 4] + 0.7152 * img[j * 4 + 1] + 0.0722 * img[j * 4 + 2]) / 255;
         var v = dark ? (thr - lum) : (lum - thr);
-        out[j] = a * CS.clamp(v / soft + 0.5, 0, 1);
+        out[j] = a * WB.clamp(v / soft + 0.5, 0, 1);
       }
     }
-    return CS.mask.sealEdges(out, g);
+    return WB.mask.sealEdges(out, g);
   };
 
 })(window.CS);

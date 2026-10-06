@@ -61,7 +61,7 @@ window.CS = window.CS || {};
     // negative scale and every arcTo/ellipse downstream throws.
     var pad = Math.min(56, W * 0.12, H * 0.12);
     var s = Math.min((W - pad * 2) / Math.max(fo.fullW, 1), (H - pad * 2) / Math.max(fo.fullH, 1));
-    s = CS.clamp(s, 0.2, 18);
+    s = WB.clamp(s, 0.2, 18);
     return { s: s, ox: W / 2, oy: H / 2 };
   };
 
@@ -88,7 +88,7 @@ window.CS = window.CS || {};
     this._grid(ctx, W, H, t);
 
     var layer = function (key) {
-      var c = CS.scratch(key, px, py);
+      var c = WB.scratch(key, px, py);
       var g2 = c.getContext('2d');
       g2.setTransform(dpr, 0, 0, dpr, 0, 0);
       g2.clearRect(0, 0, W, H);
@@ -106,7 +106,7 @@ window.CS = window.CS || {};
     ctx.shadowOffsetY = 8;
     ctx.fillStyle = shadeOf(bodyC, 0.18);
     ctx.beginPath();
-    CS.shapePath(ctx, 'rect', fo.fullW, fo.fullH, D.R, t);
+    WB.shapePath(ctx, 'rect', fo.fullW, fo.fullH, D.R, t);
     ctx.fill();
     ctx.restore();
 
@@ -161,8 +161,8 @@ window.CS = window.CS || {};
   };
 
   function shadeOf(hex, k) {
-    var c = CS.hexToRgb(hex);
-    var f = function (v) { return Math.round(CS.clamp(v * (1 - k), 0, 1) * 255); };
+    var c = WB.hexToRgb(hex);
+    var f = function (v) { return Math.round(WB.clamp(v * (1 - k), 0, 1) * 255); };
     return 'rgb(' + f(c[0]) + ',' + f(c[1]) + ',' + f(c[2]) + ')';
   }
 
@@ -221,8 +221,8 @@ window.CS = window.CS || {};
 
     if (!this._ringCache || this._ringCache.key !== key) {
       // Roughly matches the on-screen scale, so the ring isn't upscaled and soft.
-      var ppmm = CS.clamp(900 / Math.max(fo.fullW, fo.fullH), 6, 16);
-      var g = CS.makeGrid(fo.fullW, fo.fullH, ppmm);
+      var ppmm = WB.clamp(900 / Math.max(fo.fullW, fo.fullH), 6, 16);
+      var g = WB.makeGrid(fo.fullW, fo.fullH, ppmm);
       var plate = CS.faceMask(fo, g);
       var ring = CS.borderMask(face.border, fo, g, plate);
       var cv = document.createElement('canvas');
@@ -230,7 +230,7 @@ window.CS = window.CS || {};
       if (ring) {
         var ictx = cv.getContext('2d');
         var img = ictx.createImageData(g.cols, g.rows);
-        var rgb = CS.hexToRgb(face.border.color);
+        var rgb = WB.hexToRgb(face.border.color);
         var r = rgb[0] * 255, gg = rgb[1] * 255, b = rgb[2] * 255;
         for (var i = 0; i < ring.length; i++) {
           img.data[i * 4] = r; img.data[i * 4 + 1] = gg; img.data[i * 4 + 2] = b;
@@ -449,7 +449,7 @@ window.CS = window.CS || {};
         var b = self.boxes(self.transform()).filter(function (q) { return q.key === r.key; })[0];
         if (!b) return;
         var d = Math.max(4, Math.hypot(p.x - b.cx, p.y - b.cy));
-        var v = CS.clamp(r.start * (d / r.dist), r.spec.min, r.spec.max);
+        var v = WB.clamp(r.start * (d / r.dist), r.spec.min, r.spec.max);
         self.el(r.key)[r.field] = Math.round(v * 4) / 4;      // 0.25 mm steps
         canvas.style.cursor = 'nwse-resize';
         self.draw();

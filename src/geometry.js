@@ -39,11 +39,11 @@ window.CS = window.CS || {};
   /* Rounded rectangle, counter-clockwise, as [[x, y], …]. */
   function rrect(w, l, r, cx, cy, seg) {
     w = Math.max(w, 0.02); l = Math.max(l, 0.02);
-    r = CS.clamp(r, 0, Math.min(w, l) / 2 - 1e-4);
+    r = WB.clamp(r, 0, Math.min(w, l) / 2 - 1e-4);
     cx = cx || 0; cy = cy || 0;
     var hx = w / 2, hy = l / 2;
     if (r < 0.03) return [[cx + hx, cy - hy], [cx + hx, cy + hy], [cx - hx, cy + hy], [cx - hx, cy - hy]];
-    var n = CS.clamp(Math.ceil(r * 2.5), 2, Math.max(2, Math.round(seg / 4)));
+    var n = WB.clamp(Math.ceil(r * 2.5), 2, Math.max(2, Math.round(seg / 4)));
     var corners = [[hx - r, hy - r, 0], [-hx + r, hy - r, 90], [-hx + r, -hy + r, 180], [hx - r, -hy + r, 270]];
     var pts = [];
     corners.forEach(function (c) {
@@ -195,9 +195,9 @@ window.CS = window.CS || {};
     // A tray has no lid, so no hinge: still worked out (the axis is used for
     // posing) but nothing is built and nothing is reported.
     if (D.tray) warn = [];
-    var n = CS.clamp(Math.round(H.count), 1, 6), k = CS.clamp(Math.round(H.knuckles), 2, 9);
-    var rk = Math.max(1.5, H.diameter / 2), c = CS.clamp(H.clearance, 0.1, 1.5);
-    var gap = CS.clamp(H.gap, 0.1, 2);
+    var n = WB.clamp(Math.round(H.count), 1, 6), k = WB.clamp(Math.round(H.knuckles), 2, 9);
+    var rk = Math.max(1.5, H.diameter / 2), c = WB.clamp(H.clearance, 0.1, 1.5);
+    var gap = WB.clamp(H.gap, 0.1, 2);
     var inset = Math.max(H.inset, D.R + 1);
     var span0 = -Wc / 2 + inset, span1 = Wc / 2 - inset, avail = span1 - span0;
     var Lh = Math.min(H.length, (avail - (n - 1) * 3) / n);
@@ -211,7 +211,7 @@ window.CS = window.CS || {};
         ' hinge' + (n === 1 ? '' : 's') + ' along the ' + side + ' edge.' });
     }
     hg.ya = Lc / 2 + rk + c; hg.za = D.zP; hg.rk = rk; hg.c = c;
-    hg.pinR = CS.clamp(H.pin / 2, 0.3, rk - 0.5);
+    hg.pinR = WB.clamp(H.pin / 2, 0.3, rk - 0.5);
     hg.len = Lh; hg.kl = (Lh - (k - 1) * gap) / k;
     if (hg.ok) {
       for (var gi = 0; gi < n; gi++) {
@@ -241,7 +241,7 @@ window.CS = window.CS || {};
 
     /* Clasps along the edge opposite the hinge, evenly spaced. */
     warn = D.warnings;
-    var cn = (C.type === 'none' || D.tray) ? 0 : CS.clamp(Math.round(C.count), 1, 6);
+    var cn = (C.type === 'none' || D.tray) ? 0 : WB.clamp(Math.round(C.count), 1, 6);
     var cw = Math.max(4, C.width);
     D.clasps = [];
     for (var ci = 0; ci < cn; ci++) {
@@ -266,13 +266,13 @@ window.CS = window.CS || {};
 
     /* Hook latch: lugs on the lid carry a pivot pin, lugs on the base a catch
        pin, and a separate hook swings between them. Both pins are filament. */
-    var rkL = CS.clamp(C.latchD / 2, 2, 7);
+    var rkL = WB.clamp(C.latchD / 2, 2, 7);
     D.latch = {
-      rk: rkL, cl: CS.clamp(C.clearance, 0.1, 0.8),
-      pinR: CS.clamp(H.pin / 2, 0.3, rkL - 0.6),
+      rk: rkL, cl: WB.clamp(C.clearance, 0.1, 0.8),
+      pinR: WB.clamp(H.pin / 2, 0.3, rkL - 0.6),
       ear: Math.max(2.5, rkL),
-      yA: -Lc / 2 - rkL - CS.clamp(C.clearance, 0.1, 0.8),
-      drop: CS.clamp(C.latchDrop, 0, 30)
+      yA: -Lc / 2 - rkL - WB.clamp(C.clearance, 0.1, 0.8),
+      drop: WB.clamp(C.latchDrop, 0, 30)
     };
     D.latch.zA = D.zP + rkL + D.latch.cl;
     D.latch.zB = D.zP - rkL - D.latch.cl - D.latch.drop;
@@ -281,10 +281,10 @@ window.CS = window.CS || {};
     /* Swing hook: a flat hook turns on a pin set square into the lid, and its
        tip — an arc about that pin — threads through an eye on the base. The
        eye sits straight below the pivot, so the tip slides through it level. */
-    var sw = { cl: Math.max(0.3, CS.clamp(C.clearance, 0.1, 0.8)), s: 1.2, th: 3, legT: 1.6, bridgeT: 1.4, h: 2.5 };
+    var sw = { cl: Math.max(0.3, WB.clamp(C.clearance, 0.1, 0.8)), s: 1.2, th: 3, legT: 1.6, bridgeT: 1.4, h: 2.5 };
     sw.pinR = D.latch.pinR;
     sw.rb = Math.max(sw.pinR + 1.6, rkL);
-    sw.wb = CS.clamp(sw.rb * 0.9, 2, 4);
+    sw.wb = WB.clamp(sw.rb * 0.9, 2, 4);
     sw.zA = D.zP + sw.rb + 1;
     // Radius chosen so the eye's upper bar stays below the parting line where
     // the curved band passes under it, at the eye's ends.
@@ -335,9 +335,9 @@ window.CS = window.CS || {};
     D.clasps.forEach(function (q) {
       var x0 = q.xc - q.w / 2 - 1, x1 = q.xc + q.w / 2 + 1;
       if (C.type === 'snap') {
-        var t = CS.clamp(C.thickness, 0.8, 5), cl2 = CS.clamp(C.clearance, 0.05, 0.8);
-        var reach = CS.clamp(C.reach, 2, Math.max(2, D.zP - D.eb - 1));
-        var attach = CS.clamp(D.zT - D.zP - D.et - t - cl2 - 0.6, 1.2, 10);
+        var t = WB.clamp(C.thickness, 0.8, 5), cl2 = WB.clamp(C.clearance, 0.05, 0.8);
+        var reach = WB.clamp(C.reach, 2, Math.max(2, D.zP - D.eb - 1));
+        var attach = WB.clamp(D.zT - D.zP - D.et - t - cl2 - 0.6, 1.2, 10);
         zone(D.claspSide, -Lc / 2, x0, x1, D.zP - reach - 1, D.zP + attach + t + cl2 + 1);
       } else if (C.type === 'hook') {
         zone(D.claspSide, -Lc / 2, x0, x1, D.latch.chinBase - 0.5, D.latch.chinLid + 0.5);
@@ -374,7 +374,7 @@ window.CS = window.CS || {};
     D.rects.forEach(function (r) {
       var s = r.node, gTop = s._depth * D.tanP;
       var dg = s.groove.depth != null && isFinite(s.groove.depth)
-        ? CS.clamp(s.groove.depth, 1, D.Hb) : Math.max(1, s._depth * 0.7);
+        ? WB.clamp(s.groove.depth, 1, D.Hb) : Math.max(1, s._depth * 0.7);
       var sides = s.grooves || {};
       var add = function (x, y, along) {
         var rad = Math.max(2, Math.min(s.groove.width / 2, along / 2 - 0.5));
@@ -521,10 +521,10 @@ window.CS = window.CS || {};
     var q = { draft: 1.6, normal: 1, fine: 0.8, ultra: 0.6 }[state.quality] || 1;
     var scale = Math.max(0.5, T.scale || 4);
     if (CS.texEngine(state) === 'classic') {
-      var r = CS.clamp(scale / 14, 0.12, 0.45) * q;
-      return preview ? CS.clamp(r * 1.5, 0.25, 0.7) : CS.clamp(r, 0.1, 0.7);
+      var r = WB.clamp(scale / 14, 0.12, 0.45) * q;
+      return preview ? WB.clamp(r * 1.5, 0.25, 0.7) : WB.clamp(r, 0.1, 0.7);
     }
-    return preview ? CS.clamp(scale / 9 * q, 0.3, 0.8) : CS.clamp(scale / 30 * q, 0.06, 0.2);
+    return preview ? WB.clamp(scale / 9 * q, 0.3, 0.8) : WB.clamp(scale / 30 * q, 0.06, 0.2);
   };
 
   /* Plain border of one edge of a half's texture: 'bottom' / 'top' of the
@@ -533,7 +533,7 @@ window.CS = window.CS || {};
   CS.texBorder = function (T, half, edge) {
     var b = T.borders && T.borders[half] && T.borders[half][edge];
     if (b == null || !isFinite(b)) b = T.border == null ? 1 : T.border;
-    return CS.clamp(b, 0, 20);
+    return WB.clamp(b, 0, 20);
   };
 
   function texturePlan(D, state, half) {
@@ -556,7 +556,7 @@ window.CS = window.CS || {};
   function wallSetup(D, state, half, pats, res) {
     var T = state.texture, isBase = half === 'base';
     var W = D.W, L = D.L, R = D.R;
-    var ws = { isBase: isBase, depth: CS.clamp(T.depth, 0.05, 3), inCap: Math.max(0.05, D.T0 - 0.8),
+    var ws = { isBase: isBase, depth: WB.clamp(T.depth, 0.05, 3), inCap: Math.max(0.05, D.T0 - 0.8),
                raise: texRaise(D, state), STEP: 0.05 };
     ws.zLo = isBase ? D.eb : D.zP;
     ws.zHi = isBase ? D.zP : D.zT - D.et;
@@ -595,7 +595,7 @@ window.CS = window.CS || {};
        distinct even where the requested corner is sharp. */
     ws.at = function (c, ins) {
       var hx = W / 2 - ins, hy = L / 2 - ins;
-      var r = CS.clamp(R - ins, EPS_R, Math.max(EPS_R, Math.min(hx, hy) - 1e-3));
+      var r = WB.clamp(R - ins, EPS_R, Math.max(EPS_R, Math.min(hx, hy) - 1e-3));
       var ax = Math.max(0, hx - r), ay = Math.max(0, hy - r), f = c[1], an;
       switch (c[0]) {
         case 'R':  return [ax + r, -ay + 2 * ay * f, 1, 0, r, false];
@@ -613,7 +613,7 @@ window.CS = window.CS || {};
       u = ((u % ws.perimeter) + ws.perimeter) % ws.perimeter;
       for (var i = 0; i < ws.segs.length; i++) {
         var sg = ws.segs[i];
-        if (u <= sg[2] || i === ws.segs.length - 1) return ws.at([sg[0], sg[2] > 0 ? CS.clamp(u / sg[2], 0, 1) : 0], ins);
+        if (u <= sg[2] || i === ws.segs.length - 1) return ws.at([sg[0], sg[2] > 0 ? WB.clamp(u / sg[2], 0, 1) : 0], ins);
         u -= sg[2];
       }
     };
@@ -806,7 +806,7 @@ window.CS = window.CS || {};
     var ws = wallSetup(D, state, half, pats, res);
     var walls = !!(pats.front || pats.back || pats.left || pats.right) && ws.band;
     var fo = CS.faceOutline(D, half), hasFace = !!pats.face;
-    var k = CS.clamp(48 / Math.max(0.5, T.scale), 5, 14);
+    var k = WB.clamp(48 / Math.max(0.5, T.scale), 5, 14);
     k = Math.min(k, 4000 / Math.max(1, walls ? ws.perimeter : 1), 4000 / Math.max(1, fo.w));
     var wallRows = walls ? Math.ceil((ws.zHi - ws.zLo) * k) + 3 : 0;
     var faceRows = hasFace ? Math.ceil(fo.h * k) + 3 : 0;
@@ -825,7 +825,7 @@ window.CS = window.CS || {};
       }
     }
     if (hasFace) {
-      var depth = CS.clamp(T.depth, 0.05, 3), raise = texRaise(D, state).face, isBase = half === 'base';
+      var depth = WB.clamp(T.depth, 0.05, 3), raise = texRaise(D, state).face, isBase = half === 'base';
       var inCap = Math.max(0.05, (isBase ? D.bottom : D.top) - 0.8);
       var f = CS.texSampler(pats.face, T.scale, T.angle), border = CS.texBorder(T, half, 'face');
       var hx = fo.w / 2 - border, hy = fo.h / 2 - border, rr = Math.max(0, Math.min(fo.r, fo.w / 2, fo.h / 2) - border);
@@ -858,7 +858,7 @@ window.CS = window.CS || {};
     var engine = CS.texEngine(state), res = CS.texResFor(state, preview);
     if (notes && !notes._tex) {
       notes._tex = true;
-      var depth = CS.clamp(state.texture.depth, 0.05, 3), rz = texRaise(D, state);
+      var depth = WB.clamp(state.texture.depth, 0.05, 3), rz = texRaise(D, state);
       var cutIn = depth - Math.min(rz.front, rz.back, rz.left, rz.right);
       if (cutIn > D.T0 - 0.8) {
         notes.push({ level: 'warn', msg: 'Texture was limited to cutting ' + Math.max(0.05, D.T0 - 0.8).toFixed(2) +
@@ -898,7 +898,7 @@ window.CS = window.CS || {};
      standing proud. The hinge edge, and the clasp edge when a clasp hangs
      there, stay cut in: anything proud would rub the hinge or the clasp. */
   function texRaise(D, state) {
-    var T = state.texture, depth = CS.clamp(T.depth, 0.05, 3), raise = CS.clamp(T.raise || 0, -3, 3), out = {};
+    var T = state.texture, depth = WB.clamp(T.depth, 0.05, 3), raise = WB.clamp(T.raise || 0, -3, 3), out = {};
     var hangs = !D.tray && D.clasps.length && /^(snap|hook|swing)$/.test(state.clasp.type);
     // Negative sinks the whole pattern into the wall, but never so far that its
     // deepest point comes within 0.8 mm of the inside.
@@ -931,7 +931,7 @@ window.CS = window.CS || {};
      flush with it, or stand proud of it, with a crisp edge all round.
      Returns { cut, add }, or null when there is no room. */
   function faceRelief(S, D, state, half, pattern, res, props) {
-    var T = state.texture, depth = CS.clamp(T.depth, 0.05, 3), isBase = half === 'base';
+    var T = state.texture, depth = WB.clamp(T.depth, 0.05, 3), isBase = half === 'base';
     var fine = CS.texEngine(state) === 'fine';
     var sample = fine && !props ? lightFilter : filtered;
     var atlas = props && props.atlas, np = props ? NP : 3;
@@ -1018,7 +1018,7 @@ window.CS = window.CS || {};
      lip by that sweep: about lipH² / 2r for a lip at distance r from the axis. */
   function mirrorLid(S, D, state, lid, lidShell) {
     var LI = state.lidInner;
-    var gap = CS.clamp(LI.gap, 0.2, Math.max(0.2, D.Ht - 0.6));
+    var gap = WB.clamp(LI.gap, 0.2, Math.max(0.2, D.Ht - 0.6));
     var r = D.hinge.rk + D.hinge.c + D.T0;
     var keep = D.lipOn ? D.lipC + D.lipH * D.lipH / (2 * r) : 0.1;
     var filler = inter(S, prism(S, [interiorRing(D, keep)], D.zP + gap, D.zP + D.Ht + 0.05), lidShell);
@@ -1114,14 +1114,14 @@ window.CS = window.CS || {};
   function addClasps(S, D, state, base, lid, lidShell, lidCav) {
     var C = state.clasp, warn = D.warnings, hooks = null;
     if (!D.clasps.length) return { base: base, lid: lid };
-    var yF = -D.Lc / 2, cl = CS.clamp(C.clearance, 0.05, 0.8), seg = D.seg;
+    var yF = -D.Lc / 2, cl = WB.clamp(C.clearance, 0.05, 0.8), seg = D.seg;
     var addB = [], cutB = [], addL = [], cutL = [];
 
     if (C.type === 'snap') {
-      var t = CS.clamp(C.thickness, 0.8, 5), e = CS.clamp(C.catch, 0.3, 3);
-      var reach = CS.clamp(C.reach, 2, Math.max(2, D.zP - D.eb - 1));
+      var t = WB.clamp(C.thickness, 0.8, 5), e = WB.clamp(C.catch, 0.3, 3);
+      var reach = WB.clamp(C.reach, 2, Math.max(2, D.zP - D.eb - 1));
       var zb = D.zP - reach;
-      var attach = CS.clamp(D.zT - D.zP - D.et - t - cl - 0.6, 1.2, 10);
+      var attach = WB.clamp(D.zT - D.zP - D.et - t - cl - 0.6, 1.2, 10);
       if (attach < 2.5) {
         warn.push({ level: 'warn', msg: 'The lid is shallow, so the snap tabs only grip ' + attach.toFixed(1) +
           ' mm of it. A thinner tab or a taller lid makes them sturdier.' });
@@ -1401,7 +1401,7 @@ window.CS = window.CS || {};
       var rel = CS.faceRelief(state, face, wallT);
       var cells = (D.W + 8) * (D.L + 8) * ppmm * ppmm;
       var pp = cells > maxCells ? Math.max(4, ppmm * Math.sqrt(maxCells / cells)) : ppmm;
-      var g = CS.makeGrid(D.W, D.L, pp);
+      var g = WB.makeGrid(D.W, D.L, pp);
       var F = CS.faceElements(face, fo, g, which === 'base');
       out.info[which] = { F: F, rel: rel, grid: g };
       if (!F.list.length) return;
@@ -1416,7 +1416,7 @@ window.CS = window.CS || {};
 
       var solids = F.list.map(function (e) {
         var rings = [];
-        CS.contours(e.mask, g, copts).forEach(function (poly) {
+        WB.contours(e.mask, g, copts).forEach(function (poly) {
           rings.push(poly.outer.map(function (p) { return [p.x, p.y]; }));
           poly.holes.forEach(function (h) { rings.push(h.map(function (p) { return [p.x, p.y]; })); });
         });
@@ -1492,7 +1492,7 @@ window.CS = window.CS || {};
           '-layer ' + i.rel.style + ' with a floor behind it. Make it at least ' + (min * 2).toFixed(1) + ' mm.' });
       }
       if (i.F.list.length) {
-        var thin = CS.maxInscribed(i.F.all, i.grid) * 2;
+        var thin = WB.maxInscribed(i.F.all, i.grid) * 2;
         if (thin > 0 && thin < 0.8) {
           warn.push({ level: 'warn', msg: 'Thinnest detail on ' + tag + ' is about ' + thin.toFixed(2) +
             ' mm wide — under two 0.4 mm lines. Try a bolder font or a thicker border.' });
@@ -1503,7 +1503,7 @@ window.CS = window.CS || {};
         var what = r.kind === 'text' ? 'Text ' + (r.index + 1) : r.kind === 'art' ? 'Picture ' + (r.index + 1) : 'The border';
         if (!live) {
           if (r.kind !== 'border') warn.push({ level: 'bad', msg: what + ' on ' + tag + ' sits off the flat face, or is hidden behind something on top of it.' });
-        } else if (CS.mask.area(live.mask, i.grid) < CS.mask.area(r.mask, i.grid) * 0.97) {
+        } else if (WB.mask.area(live.mask, i.grid) < WB.mask.area(r.mask, i.grid) * 0.97) {
           warn.push({ level: 'warn', msg: what + ' on ' + tag + ' is partly clipped by the edge rounding or an element above it.' });
         }
       });

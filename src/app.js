@@ -150,7 +150,7 @@
     });
 
     var fs = $('#font-select'), groups = {};
-    CS.FONTS.forEach(function (f) {
+    WB.FONTS.forEach(function (f) {
       var g = groups[f.group];
       if (!g) {
         g = groups[f.group] = document.createElement('optgroup');
@@ -402,9 +402,9 @@
     var lh = D.lh, minD = CS.minDepthOf(state);
     var lay = function (v) { return CS.tidy(Math.round(v / lh) * lh); };
     var maxCut = Math.max(minD, CS.tidy(Math.floor((wallT - minD) / lh + 1e-6) * lh));
-    f.inlayDepth = CS.clamp(lay(f.inlayDepth), minD, maxCut);
+    f.inlayDepth = WB.clamp(lay(f.inlayDepth), minD, maxCut);
     var maxRelief = f.relief === 'engraved' ? maxCut : 3;
-    f.reliefHeight = CS.clamp(lay(f.reliefHeight), minD, Math.max(minD, maxRelief));
+    f.reliefHeight = WB.clamp(lay(f.reliefHeight), minD, Math.max(minD, maxRelief));
     [['#f-inlayDepth', f.inlayDepth, maxCut], ['#f-reliefHeight', f.reliefHeight, Math.max(minD, maxRelief)]]
       .forEach(function (q) {
         var el = $(q[0]);
@@ -902,7 +902,7 @@
   }
 
   /* ── build / render ─────────────────────────────────────────────── */
-  var rebuild = CS.debounce(function () {
+  var rebuild = WB.debounce(function () {
     if (!CS.manifoldReady()) return;
     var t0 = performance.now();
     var model;
@@ -1115,13 +1115,16 @@
       e.target.value = '';
     });
 
-    drawpad = new CS.DrawPad($('#drawmodal'));
+    drawpad = new WB.DrawPad($('#drawmodal'));
 
     $$('[data-draw]').forEach(function (b) {
       b.addEventListener('click', function () {
         var f = faceNow();
         var art = f.arts[f.artIdx];
-        drawpad.open('art', art ? CS.assets.drawings[art.id] : null, null);
+        drawpad.open('art', art ? CS.assets.drawings[art.id] : null, null, {
+          title: 'Draw a picture',
+          hint: 'Anything you draw is set into the face. Enclosed areas can be filled or left open.'
+        });
       });
     });
 
@@ -1291,7 +1294,7 @@
       d.layout = (function fix(n) {
         if (n.kind === 'split') {
           n.children = (n.children || []).map(fix).filter(Boolean);
-          if (!n.id) n.id = CS.newId('g');
+          if (!n.id) n.id = WB.newId('g');
           return n;
         }
         var base = CS.newSection();
@@ -1301,7 +1304,7 @@
         if (!n.item) out.item = n.shape === 'round' ? 'round' : 'box';   // saved before item shapes
         if (!out.params || typeof out.params !== 'object') out.params = {};
         if (!Array.isArray(out.prims)) out.prims = [];
-        if (!out.id) out.id = CS.newId('s');
+        if (!out.id) out.id = WB.newId('s');
         return out;
       })(ps.layout);
       d.layout = CS.layout.normalize(d.layout) || CS.defaults().layout;
@@ -1317,11 +1320,11 @@
         else f[k] = src[k];
       });
       f.texts = (f.texts || []).map(function (t) {
-        var n = CS.newText(t); n.font = CS.fontKey(n.font); return n;
+        var n = CS.newText(t); n.font = WB.fontKey(n.font); return n;
       });
       f.arts = (f.arts || []).map(function (a) { return CS.newArt(a); });
-      f.textIdx = CS.clamp(f.textIdx || 0, 0, Math.max(0, f.texts.length - 1));
-      f.artIdx = CS.clamp(f.artIdx || 0, 0, Math.max(0, f.arts.length - 1));
+      f.textIdx = WB.clamp(f.textIdx || 0, 0, Math.max(0, f.texts.length - 1));
+      f.artIdx = WB.clamp(f.artIdx || 0, 0, Math.max(0, f.arts.length - 1));
     });
 
     if (!CS.layout.find(d.layout, d.selected)) d.selected = CS.layout.sections(d.layout)[0].id;
@@ -1370,10 +1373,10 @@
     var pics = pictureCount(), btn = $('#btn-share');
     var payload = { app: 'dabba', version: 1, state: JSON.parse(CS.serialize(state)), assets: {} };
     if (pics) payload.picturesLeftOut = pics;
-    CS.shareEncode(payload).then(function (hash) {
-      var url = CS.shareBase() + hash;
-      return CS.copyText(url).then(function (ok) {
-        if (ok) CS.flashButton(btn, 'Copied ✓');
+    WB.shareEncode(payload).then(function (hash) {
+      var url = WB.shareBase() + hash;
+      return WB.copyText(url).then(function (ok) {
+        if (ok) WB.flashButton(btn, 'Copied ✓');
         var body = [];
         body.push(ok ? 'Anyone with this link can open the design and carry on editing their own copy.'
                      : 'Your browser blocked the clipboard here; copy the link above.');
@@ -1382,10 +1385,10 @@
           body.push({ warn: true, text: 'Not included: ' + (pics === 1 ? 'a picture or image texture' : pics + ' pictures or image textures') +
                      '. Links cannot carry those — to share the design complete, send the file from Save (.case.json) or the exported 3MF.' });
         }
-        CS.sharePopup({ anchor: btn, title: ok ? 'Link copied' : 'Share this link', link: url, linkCopied: ok, body: body });
+        WB.sharePopup({ anchor: btn, title: ok ? 'Link copied' : 'Share this link', link: url, linkCopied: ok, body: body });
       });
     }).catch(function (err) {
-      CS.sharePopup({ anchor: btn, kind: 'warn', title: 'Could not make a link', body: [err.message] });
+      WB.sharePopup({ anchor: btn, kind: 'warn', title: 'Could not make a link', body: [err.message] });
     });
   }
 
@@ -1393,19 +1396,19 @@
      done() runs once the design is in place. */
   function openSharedLink(done) {
     if (location.hash.indexOf('#d=') !== 0) return false;
-    CS.shareDecode(location.hash).then(function (p) {
-      history.replaceState(null, '', CS.shareBase());   // later refreshes use the session
+    WB.shareDecode(location.hash).then(function (p) {
+      history.replaceState(null, '', WB.shareBase());   // later refreshes use the session
       loadPayload(p, function () {
         done();
         var n = p.picturesLeftOut;
-        CS.sharePopup({ title: 'Opened a shared design', kind: n ? 'warn' : 'ok', body: n
+        WB.sharePopup({ title: 'Opened a shared design', kind: n ? 'warn' : 'ok', body: n
           ? [{ warn: true, text: 'It had ' + (n === 1 ? 'a picture or image texture' : n + ' pictures or image textures') +
                ' that links cannot carry. Ask the sender for the design file to get ' + (n === 1 ? 'it' : 'them') + '.' }]
           : ['Changes you make stay in your own copy.'] });
       });
     }).catch(function (err) {
-      history.replaceState(null, '', CS.shareBase());
-      CS.sharePopup({ kind: 'warn', title: 'That link could not be opened',
+      history.replaceState(null, '', WB.shareBase());
+      WB.sharePopup({ kind: 'warn', title: 'That link could not be opened',
         body: ['It looks damaged or cut short. Ask for it again, or for the design file.'] });
       if (!restoreSession(done)) done();
     });
@@ -1424,7 +1427,7 @@
     } catch (e) { return false; }
   })();
 
-  var persist = CS.debounce(function () {
+  var persist = WB.debounce(function () {
     if (!storageOK) return;
     var payload = buildPayload();
     try {

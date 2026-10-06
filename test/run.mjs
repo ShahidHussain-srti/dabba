@@ -7,7 +7,7 @@
  * a valid closed solid, and the 3MF must carry its colour assignments. */
 import { load, toManifold } from './harness.mjs';
 
-const { CS, wasm } = await load(['util.js', 'texture.js', 'items.js', 'layout.js', 'geometry.js', 'zip.js', 'export.js']);
+const { CS, wasm } = await load(['util.js', 'texture.js', 'items.js', 'layout.js', 'geometry.js', 'export.js']);
 
 let failed = 0, passed = 0;
 function check(name, ok, detail) {
