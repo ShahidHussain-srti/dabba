@@ -257,6 +257,62 @@ console.log('layout');
         'slack ' + slack.toFixed(2) + ', cavity ' + r2.l.toFixed(2));
 }
 
+console.log('moving and adding');
+{
+  const size = r => r.w.toFixed(4) + 'x' + r.l.toFixed(4);
+  // Resizing one compartment grows the box but leaves every other cavity alone.
+  const s = CS.defaults(), D0 = CS.resolve(s);
+  const secs = CS.layout.sections(s.layout);
+  let others = true, grew = true;
+  secs.forEach(sec => {
+    for (const k of ['w', 'l']) {
+      const keep = sec[k];
+      sec[k] = keep + 30;
+      const D1 = CS.resolve(s);
+      D1.rects.forEach((r, i) => { if (r.id !== sec.id && size(r) !== size(D0.rects[i])) others = false; });
+      if (D1.W * D1.L <= D0.W * D0.L) grew = false;
+      sec[k] = keep;
+    }
+  });
+  check('resizing a compartment never resizes the others', others);
+  check('resizing a compartment grows the case', grew);
+
+  // An offset moves only that compartment, and stays inside the outer wall.
+  const m = CS.defaults(), big = CS.layout.sections(m.layout)[0];
+  const Da = CS.resolve(m), ra = Da.rects.find(r => r.id === big.id);
+  big.dx = 3; big.dy = -2;
+  const Db = CS.resolve(m), rb = Db.rects.find(r => r.id === big.id);
+  // It fills the case front to back, so it can slide sideways but not forwards.
+  const ex = Math.min(3, ra.range.x[1]), ey = Math.max(-2, ra.range.y[0]);
+  check('an offset moves the compartment by that much, within its room', ex === 3 && Math.abs(rb.cx - ra.cx - ex) < 1e-9 && Math.abs(rb.cy - ra.cy - ey) < 1e-9,
+        'moved ' + (rb.cx - ra.cx).toFixed(3) + ', ' + (rb.cy - ra.cy).toFixed(3) + ' room y ' + ra.range.y.map(v => v.toFixed(2)));
+  check('an offset leaves the case and the others alone', Db.W === Da.W && Db.L === Da.L &&
+        Db.rects.every((r, i) => r.id === big.id || (r.cx === Da.rects[i].cx && r.cy === Da.rects[i].cy)));
+  big.dx = 999; big.dy = -999;
+  const Dc = CS.resolve(m), rc = Dc.rects.find(r => r.id === big.id), mg = big._margin;
+  check('a big offset is held at the outer wall', Math.abs(rc.x1 + mg - Dc.IW / 2) < 1e-9 && Math.abs(rc.y0 - mg + Dc.IL / 2) < 1e-9,
+        'x1 ' + (rc.x1 + mg).toFixed(3) + ' / ' + (Dc.IW / 2).toFixed(3));
+  big.dx = 40; big.dy = 0;
+  const Dd = CS.resolve(m), rd = Dd.rects.find(r => r.id === big.id);
+  const overlap = Dd.rects.some(r => r.id !== big.id && r.x0 < rd.x1 && r.x1 > rd.x0 && r.y0 < rd.y1 && r.y1 > rd.y0);
+  check('a moved compartment may overlap its neighbours', overlap);
+  const mo = CS.buildModel(m, { decor: false });
+  check('overlapping pockets still build a valid base', mo.parts.every(p => { const t = toManifold(wasm, p); const ok = t.status() === 'NoError' && !t.isEmpty(); t.delete(); return ok; }));
+
+  // Adding along a whole side spans it: the new compartment's slot is the full interior.
+  for (const side of ['left', 'right', 'back', 'front']) {
+    const a = CS.defaults(), before = CS.layout.sections(a.layout).length;
+    const res = CS.layout.addAtSide(a.layout, side, CS.layout.sections(a.layout)[0]);
+    a.layout = CS.layout.normalize(res.root);
+    const Da2 = CS.resolve(a), r = Da2.rects.find(q => q.id === res.id);
+    const across = side === 'left' || side === 'right' ? r.slot.y1 - r.slot.y0 : r.slot.x1 - r.slot.x0;
+    const full = side === 'left' || side === 'right' ? Da2.IL : Da2.IW;
+    const edge = { left: r.slot.x0 + Da2.IW / 2, right: Da2.IW / 2 - r.slot.x1, back: Da2.IL / 2 - r.slot.y1, front: r.slot.y0 + Da2.IL / 2 }[side];
+    check('adding along the whole ' + side + ' side spans it', CS.layout.sections(a.layout).length === before + 1 &&
+          Math.abs(across - full) < 1e-6 && Math.abs(edge) < 1e-6, 'span ' + across.toFixed(2) + '/' + full.toFixed(2) + ', edge ' + edge.toFixed(3));
+  }
+}
+
 console.log('export');
 {
   const s = CS.defaults();

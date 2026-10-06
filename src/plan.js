@@ -449,10 +449,11 @@ window.CS = window.CS || {};
     ctx.restore();
 
     this.buttons(t).forEach(function (b) {
+      var on = self.hover && self.hover.button === b.key;
+      if (b.kind === 'side') { self._sideButton(ctx, b, on); return; }
       ctx.save();
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-      var on = self.hover && self.hover.button === b.key;
       ctx.fillStyle = b.kind === 'delete' ? (on ? '#ff6b5e' : '#e0645a')
                                           : (on ? '#5aa9ff' : 'rgba(43,111,209,0.92)');
       ctx.shadowColor = 'rgba(0,0,0,0.35)';
@@ -552,6 +553,25 @@ window.CS = window.CS || {};
     this.hooks.change(true);
   };
 
+  /* Move a whole compartment. It keeps its place in the layout and gains an
+     offset, held inside the outer wall; neighbours stay where they are, and
+     overlapping is fine (the pockets merge). Snaps to 0.5 mm, Shift 0.1. */
+  Plan.prototype._dragMove = function (e, p) {
+    var d = this.drag, t = this.frozen;
+    if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) < 3) return;
+    var found = CS.layout.find(this.state.layout, d.id);
+    if (!found) return;
+    if (!d.moved) { d.moved = true; this.hooks.beginEdit(); }
+    var s = found.node, step = e.shiftKey ? 0.1 : 0.5;
+    var snap = function (v) { return Math.round(v / step) * step; };
+    s.dx = WB.tidy(WB.clamp(snap(d.dx0 + (p.x - d.x) / t.s), d.range.x[0], d.range.x[1]));
+    s.dy = WB.tidy(WB.clamp(snap(d.dy0 - (p.y - d.y) / t.s), d.range.y[0], d.range.y[1]));
+    this.describe();
+    this.canvas.style.cursor = 'grabbing';
+    this.draw();
+    this.hooks.change(true);
+  };
+
   Plan.prototype._edgeGlow = function (ctx, t, r, edge) {
     ctx.save();
     ctx.strokeStyle = 'rgba(90,169,255,0.95)';
@@ -595,7 +615,21 @@ window.CS = window.CS || {};
       out.push(custom ? { key: 'delete', kind: 'delete', x: x1 + 14, y: yT - 14, r: 8 }
                       : { key: 'delete', kind: 'delete', x: x1 - 11, y: yT + 11, r: 8 });
     }
-    return out;
+    return out.concat(this.sideButtons(t));
+  };
+
+  /* "Add along this whole side": one pill beyond each side of the case,
+     past the dimension lines and the hinge, so it can't be mistaken for the
+     selected compartment's own +. */
+  Plan.prototype.sideButtons = function (t) {
+    var ext = this.extent(), mx = sx(t, (ext.x0 + ext.x1) / 2), my = sy(t, (ext.y0 + ext.y1) / 2);
+    var gap = 48;
+    return [
+      { key: 'side:left',  kind: 'side', side: 'left',  x: sx(t, ext.x0) - gap, y: my, r: 11, vertical: true },
+      { key: 'side:right', kind: 'side', side: 'right', x: sx(t, ext.x1) + gap - 14, y: my, r: 11, vertical: true },
+      { key: 'side:back',  kind: 'side', side: 'back',  x: mx, y: sy(t, ext.y1) - gap + 14, r: 11 },
+      { key: 'side:front', kind: 'side', side: 'front', x: mx, y: sy(t, ext.y0) + gap, r: 11 }
+    ];
   };
 
   Plan.prototype._grid = function (ctx, W, H, t) {
@@ -608,6 +642,33 @@ window.CS = window.CS || {};
     ctx.beginPath();
     for (var x = ((t.ox % step) + step) % step; x < W; x += step) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); }
     for (var y = ((t.oy % step) + step) % step; y < H; y += step) { ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); }
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  /* A long outlined pill with end stops and a +: "the whole side". */
+  Plan.prototype._sideButton = function (ctx, b, on) {
+    var L = 44, Hh = 18, w = b.vertical ? Hh : L, h = b.vertical ? L : Hh;
+    ctx.save();
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(b.x - w / 2, b.y - h / 2, w, h, 9); else ctx.rect(b.x - w / 2, b.y - h / 2, w, h);
+    ctx.fillStyle = on ? 'rgba(90,169,255,0.28)' : 'rgba(43,111,209,0.14)';
+    ctx.fill();
+    ctx.strokeStyle = on ? '#5aa9ff' : 'rgba(90,169,255,0.7)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash(on ? [] : [3, 2]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = on ? '#fff' : '#9cc8ff';
+    ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath();
+    var k = 4.5, e = (b.vertical ? h : w) / 2 - 6;
+    if (b.vertical) {
+      ctx.moveTo(b.x - 4, b.y - e); ctx.lineTo(b.x + 4, b.y - e); ctx.moveTo(b.x - 4, b.y + e); ctx.lineTo(b.x + 4, b.y + e);
+    } else {
+      ctx.moveTo(b.x - e, b.y - 4); ctx.lineTo(b.x - e, b.y + 4); ctx.moveTo(b.x + e, b.y - 4); ctx.lineTo(b.x + e, b.y + 4);
+    }
+    ctx.moveTo(b.x - k, b.y); ctx.lineTo(b.x + k, b.y); ctx.moveTo(b.x, b.y - k); ctx.lineTo(b.x, b.y + k);
     ctx.stroke();
     ctx.restore();
   };
@@ -698,7 +759,11 @@ window.CS = window.CS || {};
     }
     var btns = this.buttons(t);
     for (var i = 0; i < btns.length; i++) {
-      if (Math.hypot(x - btns[i].x, y - btns[i].y) <= btns[i].r + 2) return { button: btns[i].key, b: btns[i] };
+      var bb = btns[i];
+      var hitB = bb.kind === 'side'
+        ? Math.abs(x - bb.x) <= (bb.vertical ? 11 : 24) && Math.abs(y - bb.y) <= (bb.vertical ? 24 : 11)
+        : Math.hypot(x - bb.x, y - bb.y) <= bb.r + 2;
+      if (hitB) return { button: bb.key, b: bb };
     }
     if (cr) {
       var mmx = (x - t.ox) / t.s - cr.cx, mmy = (t.oy - y) / t.s - cr.cy;
@@ -722,9 +787,14 @@ window.CS = window.CS || {};
       // their size from what they hold.
       if (cands.length && cands[0][1] <= EDGE_PX && CS.itemByKey(r.node.item).size) return { id: r.id, edge: cands[0][0] };
     }
-    for (var k = 0; k < D.rects.length; k++) {
-      var q = D.rects[k];
-      if (x >= sx(t, q.x0) && x <= sx(t, q.x1) && y >= sy(t, q.y1) && y <= sy(t, q.y0)) return { id: q.id };
+    // Bodies: the selected one first (it's drawn on top where they overlap),
+    // then the rest, last drawn first.
+    var bodies = D.rects.slice().reverse().sort(function (a, b) {
+      return (b.id === this.state.selected) - (a.id === this.state.selected);
+    }.bind(this));
+    for (var k = 0; k < bodies.length; k++) {
+      var q = bodies[k];
+      if (x >= sx(t, q.x0) && x <= sx(t, q.x1) && y >= sy(t, q.y1) && y <= sy(t, q.y0)) return { id: q.id, body: true };
     }
     var mm = { x: (x - t.ox) / t.s, y: (t.oy - y) / t.s };
     var inBox = function (b) { return mm.x >= b.x0 && mm.x <= b.x1 && mm.y >= b.y0 && mm.y <= b.y1; };
@@ -759,6 +829,7 @@ window.CS = window.CS || {};
       }
       if (h.handle === 'rotate') return 'grab';
       if (h.prim != null) return 'move';
+      if (h.body) return 'move';
       if (h.edge) return (h.edge === 'left' || h.edge === 'right') ? 'ew-resize' : 'ns-resize';
       if (h.id || h.panel) return 'pointer';
       return 'default';
@@ -770,6 +841,7 @@ window.CS = window.CS || {};
       var h = self.hit(p.x, p.y);
       if (!h) return;
       if (h.button) {
+        if (h.b.kind === 'side') { self.hooks.addSide(h.b.side); e.preventDefault(); return; }
         if (h.b.kind === 'delete') self.hooks.remove(self.state.selected);
         else self.hooks.add(self.state.selected, h.b.side);
         e.preventDefault();
@@ -794,6 +866,18 @@ window.CS = window.CS || {};
                       cx: cx0, cy: cy0, cx0: cx0, cy0: cy0 };
         canvas.setPointerCapture(e.pointerId);
         self.draw();
+        e.preventDefault();
+        return;
+      }
+      if (h.body) {
+        // Drag the whole compartment. A press without movement is just a click.
+        var rb = self.D.rects.filter(function (q) { return q.id === h.id; })[0];
+        if (!rb) return;
+        var t1 = self.transform();
+        self.frozen = { s: t1.s, ox: t1.ox, oy: t1.oy };
+        self.drag = { kind: 'move', id: h.id, x: p.x, y: p.y, dx0: rb.dx, dy0: rb.dy, range: rb.range,
+                      moved: false };
+        canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         return;
       }
@@ -823,6 +907,7 @@ window.CS = window.CS || {};
     canvas.addEventListener('pointermove', function (e) {
       var p = local(e);
       if (self.drag && self.drag.kind === 'prim') { self._dragPrim(e, p); return; }
+      if (self.drag && self.drag.kind === 'move') { self._dragMove(e, p); return; }
       if (self.drag) {
         var d = self.drag, t = self.frozen;
         var found = CS.layout.find(self.state.layout, d.id);
@@ -859,7 +944,14 @@ window.CS = window.CS || {};
 
     var end = function (e) {
       if (!self.drag) return;
+      var still = self.drag.kind === 'move' && !self.drag.moved;
       self.drag = null;
+      if (still) {
+        self.frozen = null;
+        if (e.pointerId != null && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        self.draw();
+        return;
+      }
       self.frozen = null;
       if (e.pointerId != null && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
       self.draw();

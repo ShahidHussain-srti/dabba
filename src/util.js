@@ -30,6 +30,7 @@ window.CS = window.CS || {};
       w: 40, l: 30, h: 18, depth: null, shape: 'rect',
       item: 'box', params: {}, prims: [],      // what it holds: see items.js
       alignX: 'center', alignY: 'center',
+      dx: 0, dy: 0,                            // dragged off its place in the layout, mm
       grooves: { left: false, right: false, front: false, back: false },
       groove: { width: 18, depth: null }
     }, opts || {});

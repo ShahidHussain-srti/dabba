@@ -114,8 +114,21 @@
             </div>
           </div>
           <div class="row">
+            <span class="lbl">Position <i>drag it in the plan</i></span>
+            <div class="trio pos">
+              <label><span>Across</span><span class="nf" data-unit="mm"><input type="number" data-bind="~s.dx" step="0.5"></span></label>
+              <label><span>Front–back</span><span class="nf" data-unit="mm"><input type="number" data-bind="~s.dy" step="0.5"></span></label>
+              <button class="ghost" id="btn-recentre" title="Put it back where the layout places it">Reset</button>
+            </div>
+          </div>
+          <p class="hint" id="pos-hint">Moved compartments can overlap their neighbours (the pockets merge) but stay inside the outer wall.</p>
+          <div class="row">
             <span class="lbl">Add a compartment</span>
-            <div class="btngrid">
+            <div class="seg small full" role="group" aria-label="Where to add" id="add-scope">
+              <button value="next" class="on" title="Beside this compartment, sharing its row or column">Next to this one</button>
+              <button value="side" title="Along a whole side of the case, beside everything that's there">Along a whole side</button>
+            </div>
+            <div class="btngrid" style="margin-top:6px">
               <button class="ghost" data-add="left" title="Add to the left">← Left</button>
               <button class="ghost" data-add="back" title="Add behind (towards the hinge)">↑ Behind</button>
               <button class="ghost" data-add="front" title="Add in front">↓ In front</button>
@@ -606,7 +619,7 @@
         <div class="stage" id="stage2d">
           <canvas id="cplan" tabindex="0" aria-label="Compartment plan — click to select, drag edges to resize"></canvas>
           <canvas id="cface" tabindex="0" hidden aria-label="Face decoration — click an element to select, drag to move"></canvas>
-          <div class="hud" id="hud2d">click to select · drag an edge to resize · <b>+</b> adds a neighbour · Delete removes</div>
+          <div class="hud" id="hud2d">drag to move · drag an edge to resize · <b>+</b> adds a neighbour, the outer pills a whole side · Delete removes</div>
         </div>
       </section>
       <section class="pane" id="pane-3d">

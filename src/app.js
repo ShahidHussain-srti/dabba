@@ -333,11 +333,13 @@
     if (!quiet) setPlanMode('plan');
   }
 
-  function addSection(side) {
+  /* whole: along a whole side of the case rather than beside this one. */
+  function addSection(side, whole) {
     var s = sectionNow();
-    if (!s) return;
+    if (!s && !whole) return;
     beginEdit(0);
-    var res = CS.layout.addNeighbor(state.layout, s.id, side);
+    var res = whole ? CS.layout.addAtSide(state.layout, side, s)
+                    : CS.layout.addNeighbor(state.layout, s.id, side);
     state.layout = res.root;
     if (res.id) state.selected = res.id;
     refresh();
@@ -560,8 +562,26 @@
   }
 
   function bindSections() {
+    // "Next to this one" or "Along a whole side" decides what the arrows do.
+    var addWhole = false;
+    $$('#add-scope button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        addWhole = b.value === 'side';
+        $$('#add-scope button').forEach(function (x) { x.classList.toggle('on', x === b); });
+        $$('[data-add]').forEach(function (a) {
+          var where = { left: 'left', right: 'right', back: 'back (towards the hinge)', front: 'front' }[a.dataset.add];
+          a.title = addWhole ? 'Add along the whole ' + where + ' side of the case' : 'Add next to this one, on its ' + where + ' side';
+        });
+      });
+    });
     $$('[data-add]').forEach(function (b) {
-      b.addEventListener('click', function () { addSection(b.dataset.add); });
+      b.addEventListener('click', function () { addSection(b.dataset.add, addWhole); });
+    });
+    $('#btn-recentre').addEventListener('click', function () {
+      var s = sectionNow();
+      if (!s || (!s.dx && !s.dy)) return;
+      beginEdit(0); s.dx = 0; s.dy = 0;
+      refreshValues(); apply();
     });
     $$('[data-move]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -761,7 +781,7 @@
     $('#cface').hidden = m === 'plan';
     face.hidden = m === 'plan';
     $('#hud2d').innerHTML = m === 'plan'
-      ? 'click to select · drag an edge to resize · <b>+</b> adds a neighbour · Delete removes'
+      ? 'drag to move · drag an edge to resize · <b>+</b> adds a neighbour, the outer pills a whole side · Delete removes'
       : 'click to select · drag to move · corner handles resize · arrow keys nudge';
     drawViews();
   }
@@ -1297,6 +1317,7 @@
     plan = new CS.Plan($('#cplan'), state, {
       select: function (id) { select(id, true); },
       add: function (id, side) { if (id !== state.selected) state.selected = id; addSection(side); },
+      addSide: function (side) { addSection(side, true); },
       remove: removeSection,
       focus: focusPanel,
       primSelect: function () { itemSig = ''; paintSections(); },

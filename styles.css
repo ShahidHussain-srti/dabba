@@ -22,6 +22,8 @@
 button.danger:hover{border-color:var(--bad); color:var(--bad)}
 .trio{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
 .trio label{display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--ink3)}
+.trio.pos{grid-template-columns:1fr 1fr auto; align-items:end}
+.trio.pos button{height:30px}
 .duo{display:grid; grid-template-columns:1fr 1fr; gap:8px}
 .duo label{display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--ink2)}
 .btngrid{display:grid; grid-template-columns:repeat(4,1fr); gap:5px}

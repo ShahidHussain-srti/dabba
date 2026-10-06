@@ -58,6 +58,19 @@ window.CS = window.CS || {};
     return { root: root, id: fresh.id };
   };
 
+  /* Put a new compartment along a whole side of the case: first or last in
+     the top-level row when that row runs the same way, otherwise beside
+     everything that's there now. `like` is copied for its size. */
+  L.addAtSide = function (root, side, like) {
+    var dir = AXIS[side];
+    var fresh = CS.newSection(like ? { w: like.w, l: like.l, h: like.h, shape: like.shape } : {});
+    if (root.kind === 'split' && root.dir === dir) {
+      if (BEFORE[side]) root.children.unshift(fresh); else root.children.push(fresh);
+      return { root: root, id: fresh.id };
+    }
+    return { root: CS.newSplit(dir, BEFORE[side] ? [fresh, root] : [root, fresh]), id: fresh.id };
+  };
+
   L.remove = function (root, id) {
     if (L.sections(root).length <= 1) return root;
     var hit = L.find(root, id);
@@ -184,6 +197,22 @@ window.CS = window.CS || {};
     }
     var rects = [];
     place(root, -IW / 2, IL / 2, IW, IL, inner, rects);
+
+    /* A compartment dragged in the plan keeps its place in the layout and
+       sits dx, dy off it. It may overlap its neighbours (the pockets merge)
+       but stays inside the outer wall, measured at the rim where the taper
+       makes it widest. The allowed range rides along for the plan. */
+    rects.forEach(function (r) {
+      var m = r.node._margin || 0;
+      var xr = [-IW / 2 + m - r.x0, IW / 2 - m - r.x1], yr = [-IL / 2 + m - r.y0, IL / 2 - m - r.y1];
+      xr = [Math.min(xr[0], 0), Math.max(xr[1], 0)];
+      yr = [Math.min(yr[0], 0), Math.max(yr[1], 0)];
+      var dx = WB.clamp(+r.node.dx || 0, xr[0], xr[1]), dy = WB.clamp(+r.node.dy || 0, yr[0], yr[1]);
+      r.x0 += dx; r.x1 += dx; r.cx += dx;
+      r.y0 += dy; r.y1 += dy; r.cy += dy;
+      r.dx = dx; r.dy = dy;
+      r.range = { x: xr, y: yr };
+    });
 
     var R = WB.clamp(O.corner, 0, Math.min(W, Ld) / 2 - 0.01);
     var eb = gf ? 0 : WB.clamp(O.edgeBottom, 0, Math.min(zP * 0.5, 2 * Math.min(bottom, T0)));
