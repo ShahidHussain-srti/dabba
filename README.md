@@ -112,9 +112,14 @@ to a mask, trace it into polygons, then extrude and cut it into the face. The 3D
 the exact mesh that gets exported, so what you see is what you print.
 
 Files in `src/`: `util` state, `items` compartment shapes, `layout` sizes and placement,
-`geometry` solids, `texture` surface patterns, `raster`/`edt`/`contour`/`shapes` decoration
-masks, `zip`/`export` 3MF and STL, `share` links, `gl` 3D view, `plan` the planner, `face`
-the decoration editor, `drawpad`, and `app` to wire it all up.
+`geometry` solids, `texture` surface patterns, `raster` the face masks, `export` the case as
+printable objects, `gl` 3D view, `plan` the planner, `face` the decoration editor, and `app`
+to wire it all up.
+
+The parts Dabba shares with Keychain Studio (masks and contours, borders, text and
+pictures, the 3MF writer, share links, undo, number fields and most of the styling) live in
+[Workbench](https://github.com/ShahidHussain-srti/workbench), copied into
+`vendor/workbench/`.
 
 ## Development
 
@@ -123,6 +128,7 @@ npm install      # manifold-3d, for the tests and for re-vendoring
 npm test         # geometry, collision, layout and 3MF checks in node
 npm run vendor   # rebuild vendor/manifold.js after changing the manifold-3d version
 npm run render-stl -- case.stl case.png   # look at an export without a slicer
+node ../workbench/tools/sync.mjs .        # refresh vendor/workbench from a checkout beside this one
 ```
 
 The tests check the physical things: every part is a valid closed solid, the base and lid
@@ -142,3 +148,6 @@ There's no warranty. See [LICENSE](LICENSE) for the full text.
 `vendor/manifold.js` is [Manifold](https://github.com/elalish/manifold), © The Manifold
 Authors, under the Apache License 2.0 ([vendor/LICENSE-manifold.txt](vendor/LICENSE-manifold.txt)),
 which is compatible with the GPL.
+
+`vendor/workbench/` is [Workbench](https://github.com/ShahidHussain-srti/workbench), by the
+same author under the same license.

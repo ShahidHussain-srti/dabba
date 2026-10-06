@@ -48,64 +48,8 @@
      As in Unity's inspector: the label, and the left and right edges of the
      box, are drag handles. Drag sideways to change the value — Shift for big
      steps, Alt for fine ones; click the middle of the box to type. */
-  var SCRUB_EDGE = 10;
 
-  function scrubbable(input, label) {
-    var nearEdge = function (e) {
-      var r = input.getBoundingClientRect(), x = e.clientX - r.left;
-      return x <= SCRUB_EDGE || x >= r.width - SCRUB_EDGE;
-    };
-    input.addEventListener('pointermove', function (e) {
-      if (document.body.classList.contains('scrubbing')) return;
-      input.classList.toggle('edgehot', !input.disabled && nearEdge(e));
-    });
-    input.addEventListener('pointerleave', function () { input.classList.remove('edgehot'); });
-    input.addEventListener('pointerdown', function (e) {
-      if (e.button === 0 && !input.disabled && nearEdge(e)) startScrub(e, input, input);
-    });
-    if (label) {
-      label.classList.add('scrublabel');
-      label.addEventListener('pointerdown', function (e) {
-        if (e.button === 0 && !input.disabled) startScrub(e, input, label);
-      });
-    }
-  }
 
-  function startScrub(e, input, handle) {
-    e.preventDefault();
-    var x0 = e.clientX, v0 = parseFloat(input.value);
-    if (!isFinite(v0)) v0 = 0;
-    var step = parseFloat(input.step) || 1;
-    var min = input.min !== '' ? parseFloat(input.min) : -Infinity;
-    var max = input.max !== '' ? parseFloat(input.max) : Infinity;
-    var moved = false;
-    handle.setPointerCapture(e.pointerId);
-    document.body.classList.add('scrubbing');
-
-    var move = function (ev) {
-      var dx = ev.clientX - x0;
-      if (!moved && Math.abs(dx) < 3) return;
-      moved = true;
-      var mult = ev.shiftKey ? 10 : ev.altKey ? 0.1 : 1;
-      var grain = step * (ev.altKey ? 0.1 : 1);
-      var perPx = (step >= 1 ? step / 6 : step) * mult;
-      var v = Math.min(max, Math.max(min, Math.round((v0 + dx * perPx) / grain) * grain));
-      var dp = Math.max(0, (String(grain).split('.')[1] || '').length);
-      input.value = v.toFixed(Math.min(dp, 4));
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    };
-    var up = function () {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      handle.removeEventListener('pointercancel', up);
-      document.body.classList.remove('scrubbing');
-      if (moved) input.dispatchEvent(new Event('change', { bubbles: true }));
-      else { input.focus(); input.select(); }
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', up);
-  }
 
   function bindScrubbing() {
     $$('input[type=number]').forEach(function (input) {
@@ -114,7 +58,7 @@
       if (row) label = $('label', row);
       var trio = input.closest('.trio label');
       if (trio) label = $('span', trio);
-      scrubbable(input, label);
+      WB.scrubbable(input, label);
     });
   }
 
@@ -200,8 +144,6 @@
      snapshots. A burst of changes from dragging one slider is coalesced into a
      single step: the pre-edit snapshot is captured once at the start of the
      burst and only committed after things go quiet. */
-  var undoStack = [], redoStack = [], pendingBefore = null, pendingTimer = 0;
-  var HISTORY_LIMIT = 120;
 
   function snapshot() {
     return {
@@ -211,14 +153,6 @@
     };
   }
 
-  function sameMap(a, b) {
-    var ka = Object.keys(a), kb = Object.keys(b);
-    return ka.length === kb.length && ka.every(function (k) { return a[k] === b[k]; });
-  }
-  function assetsEqual(a) {
-    return sameMap(a.images, CS.assets.images) && sameMap(a.drawings, CS.assets.drawings) &&
-           a.texture === CS.assets.texture;
-  }
 
   function restore(snap) {
     var s = JSON.parse(snap.state);
@@ -234,71 +168,20 @@
   }
 
   /* Call immediately BEFORE mutating state. */
-  function beginEdit(coalesceMs) {
-    if (pendingBefore === null) pendingBefore = snapshot();
-    clearTimeout(pendingTimer);
-    pendingTimer = setTimeout(commitEdit, coalesceMs == null ? 450 : coalesceMs);
-  }
+  var undoHistory = null;           // set up in init(), once the buttons exist
+  /* Call immediately BEFORE changing the design. */
+  function beginEdit(coalesceMs) { if (undoHistory) undoHistory.begin(coalesceMs); }
 
-  function commitEdit() {
-    clearTimeout(pendingTimer);
-    if (pendingBefore === null) return;
-    // Nothing actually changed (e.g. slider returned to its original value).
-    if (pendingBefore.state !== CS.serialize(state) || !assetsEqual(pendingBefore.assets)) {
-      undoStack.push(pendingBefore);
-      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
-      redoStack.length = 0;
-    }
-    pendingBefore = null;
-    paintHistory();
-  }
 
-  function undo() {
-    commitEdit();                     // fold any in-flight burst in first
-    if (!undoStack.length) return;
-    redoStack.push(snapshot());
-    restore(undoStack.pop());
-    paintHistory();
-  }
 
-  function redo() {
-    commitEdit();
-    if (!redoStack.length) return;
-    undoStack.push(snapshot());
-    restore(redoStack.pop());
-    paintHistory();
-  }
 
-  function paintHistory() {
-    var u = $('#btn-undo'), r = $('#btn-redo');
-    var pend = pendingBefore !== null ? 1 : 0;
-    u.disabled = !(undoStack.length + pend);
-    r.disabled = !redoStack.length;
-  }
 
   /* Text fields have their own native undo; leave those alone. */
-  function inTextEntry() {
-    var el = document.activeElement;
-    if (!el) return false;
-    if (el.tagName === 'TEXTAREA') return true;
-    return el.tagName === 'INPUT' && /^(text|number|search|email|url|password)$/.test(el.type);
-  }
 
   function bindHistory() {
-    $('#btn-undo').addEventListener('click', undo);
-    $('#btn-redo').addEventListener('click', redo);
-    document.addEventListener('keydown', function (e) {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
-      var k = e.key.toLowerCase();
-      if (k === 'z' && !e.shiftKey) {
-        if (inTextEntry()) return;
-        e.preventDefault(); undo();
-      } else if ((k === 'z' && e.shiftKey) || k === 'y') {
-        if (inTextEntry() && k === 'z') return;
-        e.preventDefault(); redo();
-      }
-    });
-    paintHistory();
+    undoHistory = new WB.History({ snapshot: snapshot, restore: restore,
+                               undoButton: $('#btn-undo'), redoButton: $('#btn-redo') });
+    undoHistory.bind();
   }
 
   /* ── declarative two-way binding ───────────────────────────────── */
@@ -672,7 +555,7 @@
       box.appendChild(hint2);
     }
     $$('#item-params [data-bind]').forEach(bindEl);
-    $$('#item-params input[type=number]').forEach(function (inp) { scrubbable(inp, inp.closest('label') && inp.closest('label').firstChild); });
+    $$('#item-params input[type=number]').forEach(function (inp) { WB.scrubbable(inp, inp.closest('label') && inp.closest('label').firstChild); });
     refreshValues();
   }
 
@@ -935,45 +818,11 @@
 
   /* Notices stay above the build warnings until dismissed, since those are
      redrawn on every rebuild. */
-  var notices = [], lastWarnings = [];
-  function notice(level, msg, link) {
-    notices = notices.filter(function (n) { return n.msg !== msg; });
-    notices.push({ level: level, msg: msg, link: link });
-    showWarnings(lastWarnings);
-  }
 
-  function showWarnings(list) {
-    lastWarnings = list || [];
-    var box = $('#warnings');
-    box.innerHTML = '';
-    notices.forEach(function (n) {
-      var d = document.createElement('div');
-      d.className = 'w ' + n.level + ' notice';
-      d.innerHTML = '<span class="ic">' + (n.level === 'warn' ? '▲' : 'ⓘ') + '</span><span class="msg"></span>' +
-        '<button type="button" class="ghost iconbtn" aria-label="Dismiss">✕</button>';
-      d.querySelector('.msg').textContent = n.msg;
-      if (n.link) {
-        var inp = document.createElement('input');
-        inp.readOnly = true; inp.value = n.link; inp.className = 'sharelink';
-        inp.addEventListener('focus', function () { inp.select(); });
-        d.querySelector('.msg').appendChild(inp);
-      }
-      d.lastChild.addEventListener('click', function () {
-        notices.splice(notices.indexOf(n), 1);
-        showWarnings(lastWarnings);
-      });
-      box.appendChild(d);
-    });
-    var order = { bad: 0, warn: 1, ok: 2 };
-    (list || []).slice().sort(function (a, b) { return order[a.level] - order[b.level]; }).forEach(function (w) {
-      var d = document.createElement('div');
-      d.className = 'w ' + w.level;
-      d.innerHTML = '<span class="ic">' +
-        (w.level === 'bad' ? '●' : w.level === 'warn' ? '▲' : 'ⓘ') + '</span><span></span>';
-      d.lastChild.textContent = w.msg;
-      box.appendChild(d);
-    });
-  }
+  var warnings = null;
+  function warningsStrip() { return warnings || (warnings = new WB.Warnings($('#warnings'))); }
+  function showWarnings(list) { warningsStrip().show(list); }
+  function notice(level, msg) { warningsStrip().notice(level, msg); }
 
   function apply(opts) {
     opts = opts || {};
@@ -1418,50 +1267,14 @@
   /* ── session persistence ────────────────────────────────────────────
      The design survives a refresh via localStorage. Artwork is stored too, but
      dropped rather than losing the design if the quota is hit. */
-  var STORE_KEY = 'dabba.session.v1';
-  var storageOK = (function () {
-    try {
-      localStorage.setItem('dabba.probe', '1');
-      localStorage.removeItem('dabba.probe');
-      return true;
-    } catch (e) { return false; }
-  })();
+  function clearSession() { session.clear(); }
+  /* Returns true when a stored design is being restored. */
+  function restoreSession(done) { return session.restore(done); }
+  var session = new WB.Session({ key: 'dabba.session.v1', build: buildPayload, load: loadPayload });
+  var storageOK = session.ok;
+  function persist() { session.save(); }
 
-  var persist = WB.debounce(function () {
-    if (!storageOK) return;
-    var payload = buildPayload();
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(payload));
-    } catch (e) {
-      try {                                   // over quota: keep the design at least
-        payload.assets = {};
-        payload.assetsDropped = true;
-        localStorage.setItem(STORE_KEY, JSON.stringify(payload));
-      } catch (e2) { /* give up silently; the design is still on screen */ }
-    }
-  }, 900);
 
-  function clearSession() {
-    if (!storageOK) return;
-    try { localStorage.removeItem(STORE_KEY); } catch (e) { /* nothing to undo */ }
-  }
-
-  function restoreSession(done) {
-    if (!storageOK) return false;
-    var raw;
-    try { raw = localStorage.getItem(STORE_KEY); } catch (e) { return false; }
-    if (!raw) return false;
-    try {
-      var p = JSON.parse(raw);
-      loadPayload(p, function () {
-        done(p.assetsDropped ? 'Restored your last session, but the artwork was too large to keep.' : null);
-      });
-      return true;
-    } catch (e) {
-      clearSession();
-      return false;
-    }
-  }
 
   /* ── geometry engine ────────────────────────────────────────────── */
   function loadEngine() {
@@ -1573,8 +1386,8 @@
   CS.getViewer = function () { return viewer; };
   CS.getPlan = function () { return plan; };
   CS.getModel = function () { return lastModel; };
-  CS.undo = undo;
-  CS.redo = redo;
+  CS.undo = function () { undoHistory.undo(); };
+  CS.redo = function () { undoHistory.redo(); };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
