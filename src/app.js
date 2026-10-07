@@ -171,6 +171,12 @@
   var undoHistory = null;           // set up in init(), once the buttons exist
   /* Call immediately BEFORE changing the design. */
   function beginEdit(coalesceMs) { if (undoHistory) undoHistory.begin(coalesceMs); }
+  /* Load a design as one undo step. Loading can wait on pictures, so the step
+     stays open until it is in. */
+  function loadAsStep(payload, after) {
+    beginEdit(600000);
+    loadPayload(payload, function () { after(); if (undoHistory) undoHistory.commit(); });
+  }
 
 
 
@@ -623,8 +629,10 @@
     });
     $('#btn-recentre').addEventListener('click', function () {
       var s = sectionNow();
-      if (!s || (!s.dx && !s.dy)) return;
+      if (!s || (!s.dx && !s.dy && s.alignX !== 'custom' && s.alignY !== 'custom')) return;
       beginEdit(0); s.dx = 0; s.dy = 0;
+      if (s.alignX === 'custom') s.alignX = 'center';
+      if (s.alignY === 'custom') s.alignY = 'center';
       refreshValues(); apply();
     });
     $$('[data-move]').forEach(function (b) {
@@ -927,11 +935,41 @@
     });
   }
 
+  // The compartment's rect as last laid out (D is refreshed on every apply).
+  function rectNow(s) { return s && D ? D.rects.filter(function (q) { return q.id === s.id; })[0] : null; }
+
   function onEdit(path, el) {
+    if (path === '~s.alignX' || path === '~s.alignY') {
+      var sc = sectionNow(), axc = path === '~s.alignX' ? 'x' : 'y', kc = 'align' + axc.toUpperCase();
+      if (sc && sc[kc] === 'custom') {
+        // Custom: it stays where it is, and the position below now sets it.
+        sc[kc] = sc._fill && sc._fill[axc] ? 'stretch' : 'center';
+        CS.layout.toCustom(sc, rectNow(sc), axc);
+        sc[kc] = 'custom';
+      } else if (sc) {
+        // A fixed alignment puts it back in place along that axis.
+        sc[axc === 'x' ? 'dx' : 'dy'] = 0;
+      }
+    }
+    if ((path === '~s.dx' || path === '~s.dy') && sectionNow()) {
+      // Typing a position makes that axis custom, measured from the slot's middle.
+      var sd = sectionNow(), axd = path === '~s.dx' ? 'x' : 'y', kd = 'align' + axd.toUpperCase(), dk = axd === 'x' ? 'dx' : 'dy';
+      var typed = sd[dk], rd = rectNow(sd);
+      if (sd[kd] !== 'custom') CS.layout.toCustom(sd, rd, axd);
+      sd[kd] = 'custom';
+      // Kept as typed, but no further than the outer wall allows.
+      if (rd && rd.range && isFinite(typed)) {
+        var base = (axd === 'x' ? rd.cx - (rd.slot.x0 + rd.slot.x1) / 2 : rd.cy - (rd.slot.y0 + rd.slot.y1) / 2) - (rd[dk] || 0);
+        var rg = rd.range[axd];
+        typed = WB.clamp(typed, base + rg[0], base + rg[1]);
+      }
+      sd[dk] = CS.tidy(typed);
+    }
     // Leaving Fill keeps the size it had, so nothing jumps.
     if (path === '~s.alignX' || path === '~s.alignY') {
       var sf = sectionNow(), ax = path === '~s.alignX' ? 'x' : 'y';
-      if (sf && sf._fill && sf._fill[ax] && sf['align' + ax.toUpperCase()] !== 'stretch' && sf._size) {
+      // Only shapes that really grow (box, oval); others never changed size.
+      if (sf && sf._fill && sf._fill[ax] && sf['align' + ax.toUpperCase()] !== 'stretch' && sf._size && sf._shape && sf._shape.fill) {
         if (ax === 'x') sf.w = Math.round(sf._size.w * 10) / 10; else sf.l = Math.round(sf._size.l * 10) / 10;
         sf._fill[ax] = false;
       }
@@ -1161,8 +1199,7 @@
       fr.onload = function () {
         try {
           var parsed = JSON.parse(fr.result);
-          beginEdit(0);
-          loadPayload(parsed, afterLoad);
+          loadAsStep(parsed, afterLoad);
         } catch (err) {
           showWarnings([{ level: 'bad', msg: 'That file could not be loaded: ' + err.message }]);
         }
@@ -1210,13 +1247,22 @@
     var assets = p.assets || {};
     var d = CS.defaults();
 
+    // A saved or shared value only replaces a default of the same kind, so a
+    // damaged link can't leave, say, text where a number belongs.
+    var sameKind = function (a, b) {
+      if (a === null || a === undefined) return true;
+      if (typeof a === 'number') return typeof b === 'number' && isFinite(b);
+      if (Array.isArray(a)) return Array.isArray(b);
+      if (typeof a === 'object') return !!b && typeof b === 'object' && !Array.isArray(b);
+      return typeof a === typeof b;
+    };
     (function merge(dst, src) {
       Object.keys(dst).forEach(function (k) {
         if (src[k] === undefined || k === 'layout' || k === 'faces') return;
         if (dst[k] && typeof dst[k] === 'object' && !Array.isArray(dst[k]) &&
             src[k] && typeof src[k] === 'object' && !Array.isArray(src[k])) {
           merge(dst[k], src[k]);
-        } else { dst[k] = src[k]; }
+        } else if (sameKind(dst[k], src[k])) { dst[k] = src[k]; }
       });
     })(d, ps);
 
@@ -1224,6 +1270,7 @@
     if (ps.lidInner && ps.lidInner.mode === 'mirror' && ps.lidInner.depth === 'full') {
       d.lidInner.mode = 'walls'; d.lidInner.depth = 'mirror';
     }
+    if (d.lidInner.depth !== 'fit') d.lidInner.depth = 'mirror';   // 'full' and anything older
     if (ps.texture && ps.texture.border != null && !ps.texture.borders) {
       var b0 = ps.texture.border;
       d.texture.borders = { base: { bottom: b0, top: b0, face: b0 }, lid: { bottom: b0, top: b0, face: b0 } };
@@ -1249,6 +1296,21 @@
         return out;
       })(ps.layout);
       d.layout = CS.layout.normalize(d.layout) || CS.defaults().layout;
+      // Saved before Custom: a moved compartment kept its alignment and an
+      // offset from it. Turn that into Custom at the same place.
+      var olds = CS.layout.sections(d.layout).filter(function (n) {
+        return (n.dx && n.alignX !== 'custom' && n.alignX !== 'stretch') || (n.dy && n.alignY !== 'custom' && n.alignY !== 'stretch');
+      });
+      if (olds.length) {
+        try {
+          var Dm = CS.describe(d);
+          olds.forEach(function (n) {
+            var r = Dm.rects.filter(function (q) { return q.id === n.id; })[0];
+            if (n.dx && n.alignX !== 'custom' && n.alignX !== 'stretch') CS.layout.toCustom(n, r, 'x');
+            if (n.dy && n.alignY !== 'custom' && n.alignY !== 'stretch') CS.layout.toCustom(n, r, 'y');
+          });
+        } catch (err) { /* keep them as they were */ }
+      }
     }
 
     ['lid', 'base'].forEach(function (w) {
@@ -1393,7 +1455,8 @@
       remove: removeSection,
       focus: focusPanel,
       primSelect: function () { itemSig = ''; paintSections(); },
-      beginEdit: function () { beginEdit(450); },
+      beginEdit: function (ms) { beginEdit(ms == null ? 450 : ms); },
+      endEdit: function () { if (undoHistory) undoHistory.commit(); },
       change: function (dragging) {
         if (dragging) { D = CS.describe(state); paintSections(); refreshValues(); rebuild(); persist(); return; }
         refresh();
@@ -1442,6 +1505,12 @@
     assets();
     exports_();
 
+    // A link pasted into a tab that already has the app open.
+    window.addEventListener('hashchange', function () {
+      if (location.hash.indexOf('#d=') !== 0) return;
+      beginEdit(600000);
+      openSharedLink(function () { afterLoad(); if (undoHistory) undoHistory.commit(); });
+    });
     var restoring = openSharedLink(afterLoad) ||
       restoreSession(function (note) {
         afterLoad();

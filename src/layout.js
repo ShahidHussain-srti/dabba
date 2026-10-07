@@ -72,6 +72,24 @@ window.CS = window.CS || {};
     return { root: CS.newSplit(dir, BEFORE[side] ? [fresh, root] : [root, fresh]), id: fresh.id };
   };
 
+  /* Switch one axis of a compartment to a custom position without it
+     moving: from then on dx / dy is measured from the middle of its slot.
+     `r` is its rect as last laid out. Returns how far the offset's zero moved,
+     for a drag in progress. A filled axis keeps the size it had. */
+  L.toCustom = function (s, r, axis) {
+    var k = axis === 'x' ? 'alignX' : 'alignY', d = axis === 'x' ? 'dx' : 'dy';
+    if (s[k] === 'custom' || !r) return 0;
+    if (s[k] === 'stretch' && s._size && s._shape && s._shape.fill) {
+      if (axis === 'x') s.w = Math.round(s._size.w * 10) / 10; else s.l = Math.round(s._size.l * 10) / 10;
+      if (s._fill) s._fill[axis] = false;
+    }
+    var mid = axis === 'x' ? (r.slot.x0 + r.slot.x1) / 2 : (r.slot.y0 + r.slot.y1) / 2;
+    var off = CS.tidy((axis === 'x' ? r.cx : r.cy) - mid), shift = off - (r[d] || 0);
+    s[k] = 'custom';
+    s[d] = off;
+    return shift;
+  };
+
   L.remove = function (root, id) {
     if (L.sections(root).length <= 1) return root;
     var hit = L.find(root, id);
@@ -118,15 +136,21 @@ window.CS = window.CS || {};
     var warn = [];
 
     var fit = Math.max(0, state.fit);
-    var hmax = 0;
+    var hmax = 0, held = 0;
     // What each compartment holds, as pocket shapes (items.js).
     secs.forEach(function (s) {
       if (!s.item) s.item = s.shape === 'round' ? 'round' : 'box';
       s._shape = CS.itemShape(s, fit);
       if (s._shape.h > hmax) hmax = s._shape.h;
+      // Shapes held at their own depth (standing batteries, bits) stand that
+      // much higher out of the base, into the lid.
+      s._shape.prims.forEach(function (q) {
+        if (q.depth != null && isFinite(q.depth)) held = Math.max(held, s._shape.h - Math.max(lh, q.depth));
+      });
     });
 
-    var autoHi = snap(hmax + Math.max(0, state.headroom), 'up');
+    var tray0 = state.build === 'tray', room = Math.max(0, state.headroom);
+    var autoHi = snap(Math.max(hmax + room, tray0 || !held ? 0 : (held + room) / Math.max(0.15, 1 - state.split)), 'up');
     var Hi = state.interior.auto ? autoHi : snap(Math.max(state.interior.height, lh * 4));
     if (!state.interior.auto && Hi < autoHi - 1e-6) {
       warn.push({ level: 'warn', msg: 'The interior is ' + Hi.toFixed(1) + ' mm tall but the tallest object needs ' +
@@ -165,7 +189,9 @@ window.CS = window.CS || {};
       s._cw = sh.w;
       s._cl = sh.l;
       if (s._depth > depthMax) depthMax = s._depth;
-      var stickUp = sh.h - s._depth;
+      // How far the object rises above the rim, held at its shallowest shape.
+      var stickUp = sh.h - (sh.prims.length ? Math.min.apply(null, sh.prims.map(function (q) { return q._depth; })) : s._depth);
+      s._stickUp = stickUp;
       if (tray && stickUp > 0.05) {
         warn.push({ level: 'warn', msg: label(s, secs) + ' stands ' + stickUp.toFixed(1) + ' mm above the rim of the tray.' });
       } else if (!tray && stickUp > Ht - 0.1 + 1e-6) {
@@ -211,7 +237,9 @@ window.CS = window.CS || {};
     rects.forEach(function (r) {
       // The object size it ends up with: what was asked for, or with Fill,
       // whatever its slot gives it.
-      r.node._size = { w: CS.tidy(r.w - 2 * fit), l: CS.tidy(r.l - 2 * fit) };
+      // Only boxes and ovals grow with Fill; other shapes keep their own size.
+      var grows = r.node._shape && r.node._shape.fill;
+      r.node._size = grows ? { w: CS.tidy(r.w - 2 * fit), l: CS.tidy(r.l - 2 * fit) } : { w: r.node.w, l: r.node.l };
       r.node._fill = { x: r.node.alignX === 'stretch', y: r.node.alignY === 'stretch' };
       var m = r.node._margin || 0;
       var xr = [-IW / 2 + m - r.x0, IW / 2 - m - r.x1], yr = [-IL / 2 + m - r.y0, IL / 2 - m - r.y1];
@@ -250,7 +278,7 @@ window.CS = window.CS || {};
       lh: lh, fit: fit, Hi: Hi, Hb: Hb, Ht: Ht, bottom: bottom, top: top,
       zP: zP, zT: zT, IW: IW, IL: IL, W: W, L: Ld, T0: T0, grow: grow,
       R: R, Ri: Math.max(0, R - T0), eb: eb, et: et, tanO: tanO, tanP: tanP,
-      inner: inner, rects: rects, sections: secs, depthMax: depthMax, tray: tray, grid: grid,
+      inner: inner, rects: rects, dividers: rects.walls || [], sections: secs, depthMax: depthMax, tray: tray, grid: grid,
       lipOn: lipOn, lipSides: lipSides, lipH: lipH, lipC: lipC, lipT: lipT, warnings: warn
     };
   };
@@ -309,7 +337,14 @@ window.CS = window.CS || {};
     var cursor = grow.length ? 0 : slack / 2;
 
     n.children.forEach(function (c, i) {
-      if (i) cursor += inner;
+      if (i) {
+        // The divider between this child's area and the last one's, right
+        // across this split's region: the lid's thin walls follow these.
+        out.walls = out.walls || [];
+        out.walls.push(n.dir === 'x' ? { x0: x0 + cursor, x1: x0 + cursor + inner, y0: y0 - sl, y1: y0 }
+                                     : { x0: x0, x1: x0 + sw, y0: y0 - cursor - inner, y1: y0 - cursor });
+        cursor += inner;
+      }
       var size = (n.dir === 'x' ? c._m.w : c._m.l) + (grow.indexOf(c) >= 0 ? share : 0);
       if (n.dir === 'x') place(c, x0 + cursor, y0, size, sl, inner, out);
       else place(c, x0, y0 - cursor, sw, size, inner, out);

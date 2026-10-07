@@ -349,9 +349,11 @@ window.CS = window.CS || {};
       if (pr.zTopNub + pr.cl > D.zP - 0.8) {
         warn.push({ level: 'warn', msg: 'The press latch reaches only a little below the rim for its hook. More reach makes a sturdier catch.' });
       }
-      if (pr.strain > 0.03) {
-        warn.push({ level: 'warn', msg: 'The press latch\'s web bends ' + (pr.strain * 100).toFixed(1) + '% to open, more than PLA likes to repeat. ' +
-          'More reach, a smaller hook depth or a taller lid lowers it.' });
+      // The stand-off grows to keep the web's bend gentle (2.5%); a long one
+      // means a tab sticking far out of the case.
+      if (pr.gP > 6) {
+        warn.push({ level: 'warn', msg: 'The press latch stands ' + pr.gP.toFixed(1) + ' mm off the wall so its web bends gently enough to last. ' +
+          'A thinner web, a smaller hook depth or more reach brings it in.' });
       }
       if (pr.gapAt + pr.e + pr.cl > D.T0 - 0.8) {
         warn.push({ level: 'bad', msg: 'The press latch slots are nearly through the ' + D.T0.toFixed(1) + ' mm wall. Use a smaller hook depth or thicker walls.' });
@@ -1061,44 +1063,131 @@ window.CS = window.CS || {};
      sideways across the lip as it opens, so the walls also keep back from the
      lip by that sweep: about lipH² / 2r for a lip at distance r from the axis. */
   /* baseCuts: the base's pocket solids, for an exact mirror. */
-  function mirrorLid(S, D, state, lid, lidShell, baseCuts) {
+  function mirrorLid(S, D, state, lid, lidShell, baseCuts, ov) {
     var LI = state.lidInner;
     var gap = WB.clamp(LI.gap, 0.2, Math.max(0.2, D.Ht - 0.6));
-    var r = D.hinge.rk + D.hinge.c + D.T0;
-    var keep = D.lipOn ? D.lipC + D.lipH * D.lipH / (2 * r) : 0.1;
-    var filler = inter(S, prism(S, [interiorRing(D, keep)], D.zP + gap, D.zP + D.Ht + 0.05), lidShell);
+    var top = D.zP + D.Ht + 0.05;
+    /* What the lid's walls may fill. Where the base's lip rises into the lid
+       they keep back from the case wall by the lip's clearance and the inward
+       sweep it makes as the lid swings; above the lip, and everywhere when
+       there is none, they run into the case wall and join it. */
+    var filler;
+    if (D.lipOn) {
+      var r = D.hinge.rk + D.hinge.c + D.T0;
+      var keep = D.lipC + D.lipH * D.lipH / (2 * r), zLip = Math.min(top, D.zP + D.lipH + D.lipC + 0.4);
+      filler = union(S, [prism(S, [interiorRing(D, keep)], D.zP + gap, zLip),
+                         zLip < top ? prism(S, [interiorRing(D, -0.05)], zLip, top) : null]);
+    } else {
+      filler = prism(S, [interiorRing(D, -0.05)], D.zP + gap, top);
+    }
+    filler = inter(S, filler, lidShell);
+    D.lidGap = gap;
+    var n = D.rects.length, cuts = (baseCuts || []).slice(0, n);
+
     /* Mirror the base: every base pocket reflected about the middle of the gap,
        so the base rim lands on the lid's lower face and depth, floor rounding,
        rim round-over, taper and the shapes inside all match, face to face. A
        pocket deeper than the lid simply opens up to the lid top. */
-    var depthMode = LI.mode === 'walls' ? 'full' : LI.depth;   // walls only: pockets open to the lid top
-    if (depthMode === 'mirror' && baseCuts) {
+    if (LI.mode === 'mirror' && LI.depth !== 'fit') {
       var zm = D.zP + gap / 2;
-      var mirrored = baseCuts.filter(Boolean).map(function (c) {
+      var mirrored = (baseCuts || []).filter(Boolean).map(function (c) {
         return S.k(S.k(c.mirror([0, 0, 1])).translate([0, 0, 2 * zm]));
       });
-      D.lidGap = gap;
       return mirrored.length ? union(S, [lid, sub(S, filler, union(S, mirrored))]) : union(S, [lid, filler]);
     }
-    var pockets = D.rects.map(function (rc) {
-      var s = rc.node, gTop = s._depth * s._tanP;
-      var dl = D.Ht + 1;
-      if (depthMode === 'fit') {
-        var up = Math.max(0, s.h - s._depth) + Math.max(0.3, state.headroom);
+
+    if (LI.mode === 'thin') {
+      /* Thin walls: one divider wherever two compartments' areas meet in the
+         layout, as thick as the inner wall between them, and nothing else. A
+         small or oval compartment gets the whole rectangle it takes up, and
+         the outer wall closes any side with no neighbour. */
+      var z0 = D.zP - 1, hz = D.Ht + 2, t = D.inner;
+      var thin = union(S, (D.dividers || []).map(function (w) { return box(S, w.x0, w.y0, z0, w.x1, w.y1, z0 + hz); }));
+      if (ov) {
+        // Overlapping compartments are one area: drop the dividers inside it
+        // and run one thin wall round its edge.
+        ov.forEach(function (g) {
+          var inside = move(S, S.k(S.k(g.area.offset(t / 2 + 0.05, 'Miter', 2)).extrude(hz)), 0, 0, z0);
+          var ring = S.k(S.k(g.area.offset(t, 'Miter', 2)).subtract(g.area));
+          thin = union(S, [sub(S, thin, inside), move(S, S.k(ring.extrude(hz)), 0, 0, z0)]);
+        });
+      }
+      return thin ? union(S, [lid, inter(S, filler, thin)]) : lid;
+    }
+
+    /* Walls only, or mirrored pockets that stop over each object: every
+       compartment's outline where its base wall stands, straight up, so the
+       lid's walls sit square on the base's. */
+    var lines = wallOutlines(S, D, cuts);
+    var pockets = D.rects.map(function (rc, i) {
+      if (!lines[i]) return null;
+      var s = rc.node, dl = D.Ht + 1;
+      if (LI.mode === 'mirror') {
+        var up = Math.max(0, s._stickUp != null ? s._stickUp : s.h - s._depth) + Math.max(0.3, state.headroom);
         dl = Math.max(gap + 0.6, up);
         if (dl > D.Ht - 0.3) dl = D.Ht + 1;
       }
-      var ring = function (z, g) {
-        var pts = s.shape === 'round'
-          ? ellipse(rc.w / 2 + g, rc.l / 2 + g, rc.cx, rc.cy, D.seg)
-          : rrect(rc.w + 2 * g, rc.l + 2 * g, Math.max(0, Math.min(s._P.corner, Math.min(rc.w, rc.l) / 2) + g), rc.cx, rc.cy, D.seg);
-        return lift(pts, z);
-      };
-      // Matches the base pocket at the rim and keeps its taper going.
-      return loft(S, [ring(D.zP - 1, gTop), ring(D.zP + dl, Math.max(0, gTop - dl * s._tanP))], true);
+      return move(S, S.k(lines[i].extrude(dl + 1)), 0, 0, D.zP - 1);
     });
-    D.lidGap = gap;
     return union(S, [lid, sub(S, filler, union(S, pockets))]);
+  }
+
+  /* Each compartment's outline where its walls stand: its cut sliced just
+     under the rim round-over, widened by the taper over that drop, so it is
+     the outline at the rim without the round-over's flare. */
+  function wallOutlines(S, D, cuts) {
+    return cuts.map(function (c, i) {
+      if (!c) return null;
+      var s = D.rects[i].node, rr = Math.max(0, Math.min(s._P ? s._P.rim : 0, D.inner / 2 - 0.3));
+      var dd = Math.min(rr + 0.05, s._depth * 0.5);
+      var sl = S.k(c.slice(D.zP - dd)), w = dd * (s._tanP || 0);
+      return w > 1e-3 ? S.k(sl.offset(w, 'Round', 2, D.seg)) : sl;
+    });
+  }
+
+  /* ── overlapping compartments ───────────────────────────────────── */
+  /* Compartments dragged over each other merge into one pocket in the base.
+     For the lid's thin walls each such group counts as one area: the union
+     of the members' slots and pocket outlines. Returns the groups, each with
+     that area as a CrossSection, or null when nothing overlaps. */
+  function overlapGroups(S, D, cuts) {
+    if (!D.rects.some(function (r) { return Math.abs(r.dx || 0) > 1e-6 || Math.abs(r.dy || 0) > 1e-6; })) return null;
+    var feet = wallOutlines(S, D, cuts);
+    var moved = D.rects.map(function (r) { return Math.abs(r.dx || 0) > 1e-6 || Math.abs(r.dy || 0) > 1e-6; });
+    // Each area with the divider strip round it.
+    var zones = D.rects.map(function (r) {
+      var sl = r.slot, e = D.inner - 0.05;
+      return S.k(new WASM.CrossSection([[[sl.x0 - e, sl.y0 - e], [sl.x1 + e, sl.y0 - e], [sl.x1 + e, sl.y1 + e], [sl.x0 - e, sl.y1 + e]]]));
+    });
+    var root = D.rects.map(function (r, i) { return i; });
+    var find = function (i) { while (root[i] !== i) i = root[i] = root[root[i]]; return i; };
+    var any = false;
+    // Joined when their pockets overlap, or when a moved one pushes into the
+    // other's area or the divider beside it, so no divider runs through it.
+    var meets = function (a, b) {
+      if (!feet[a] || !feet[b]) return false;
+      if (S.k(feet[a].intersect(feet[b])).area() > 0.01) return true;
+      return moved[a] && S.k(feet[a].intersect(zones[b])).area() > 0.01;
+    };
+    for (var a = 0; a < feet.length; a++) {
+      for (var b = 0; b < feet.length; b++) {
+        if (a !== b && find(a) !== find(b) && meets(a, b)) { root[find(a)] = find(b); any = true; }
+      }
+    }
+    if (!any) return null;
+    var groups = {};
+    D.rects.forEach(function (r, i) { var g = find(i); (groups[g] = groups[g] || []).push(i); });
+    return Object.keys(groups).map(function (k) { return groups[k]; }).filter(function (m) { return m.length > 1; }).map(function (m) {
+      var parts = [];
+      m.forEach(function (i) {
+        var sl = D.rects[i].slot;
+        parts.push(S.k(new WASM.CrossSection([[[sl.x0, sl.y0], [sl.x1, sl.y0], [sl.x1, sl.y1], [sl.x0, sl.y1]]])));
+        if (feet[i]) parts.push(feet[i]);
+      });
+      var area = parts[0];
+      for (var j = 1; j < parts.length; j++) area = S.k(area.add(parts[j]));
+      return { members: m, area: area };
+    });
   }
 
   /* ── shaped pockets ─────────────────────────────────────────────── */
@@ -1371,6 +1460,7 @@ window.CS = window.CS || {};
         base = union(S, [base, sub(S, lipRing, lipCuts(S, D, D.lipC))]);
       }
       var cuts = D.rects.map(function (r) { return sectionCut(S, D, P, r, zTop, interiorPrism); });
+      var ov = !D.tray && state.lidInner && state.lidInner.mode === 'thin' ? overlapGroups(S, D, cuts) : null;
 
       if (D.notches.length) {
         var keepIn = 1 + D.grow;
@@ -1401,7 +1491,7 @@ window.CS = window.CS || {};
           lid = sub(S, lid, sub(S, groove, lipCuts(S, D, 0)));
         }
         var LIm = state.lidInner && state.lidInner.mode;
-        if (LIm === 'mirror' || LIm === 'walls') lid = mirrorLid(S, D, state, lid, lidShell, cuts);
+        if (LIm === 'mirror' || LIm === 'walls' || LIm === 'thin') lid = mirrorLid(S, D, state, lid, lidShell, cuts, ov);
       }
 
       /* Into the canonical frame for the hinge and clasps, then back. */

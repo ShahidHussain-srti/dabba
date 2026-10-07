@@ -55,7 +55,8 @@ locked until you turn Fill off.
 - An alignment lip that can be turned off per edge, so the inside can be flush where
   you reach in.
 - A lid that's open inside, has walls only (dividers over the base's walls, so nothing slides
-  between compartments), or mirrors the base's compartments exactly, with the same depth,
+  between compartments), thin walls (one thin divider wherever two compartments' areas meet,
+  the case wall closing the rest), or mirrors the base's compartments exactly, with the same depth,
   rounding and shapes, so things are held from above when it's shut.
 - A filament-pin hinge on any edge: count, knuckles, length, pin size and clearances are
   all adjustable.
@@ -82,8 +83,9 @@ gets its own colour, set in, engraved or raised.
 ### Getting around
 
 Click a compartment in the plan to select it, drag its edges or corners to resize it, and
-drag it to move it. A moved compartment can overlap its neighbours (the pockets merge) but
-stays inside the outer wall. Use **+** to add a neighbour, the dashed pills outside the case
+drag it to move it. Moving it, or typing a position, sets that direction to Custom
+(each direction also has Left / Centre / Right / Fill). A moved compartment can overlap its
+neighbours (the pockets merge) but stays inside the outer wall. Use **+** to add a neighbour, the dashed pills outside the case
 to add a compartment along a whole side, and Delete to remove one. The 3D view can show the case closed, open at any angle,
 or laid out for printing. Number boxes work like Unity's inspector: type a value, or drag
 sideways on the label or the edge of the box (Shift for bigger steps, Alt for finer).
@@ -100,7 +102,7 @@ saved file or the exported 3MF instead.
 ## Printing
 
 The 3MF comes laid out ready to print: the base upright, and the lid flipped open beside
-it so its top is on the bed. Hook latches add a third small piece. Every part is a closed,
+it so its top is on the bed. Hook latches and swing hooks add a third small piece. Every part is a closed,
 watertight solid, and every height is a whole number of layers, so set the layer height to
 match your slicer.
 

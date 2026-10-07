@@ -332,6 +332,16 @@ console.log('moving and adding');
     check('adding along the whole ' + side + ' side spans it', CS.layout.sections(a.layout).length === before + 1 &&
           Math.abs(across - full) < 1e-6 && Math.abs(edge) < 1e-6, 'span ' + across.toFixed(2) + '/' + full.toFixed(2) + ', edge ' + edge.toFixed(3));
   }
+  // A compartment dragged over another merges with it in the base.
+  const o = CS.defaults();
+  CS.layout.sections(o.layout)[1].dx = -8;
+  const mOv = CS.buildModel(o, { decor: false }), Do = mOv.D, ro = Do.rects[1];
+  const bo = toManifold(wasm, mOv.parts.find(p => p.key === 'base'));
+  const at = (x, y) => { const c = wasm.Manifold.cube([0.3, 0.3, 0.3], true).translate([x, y, Do.zP - 3]); const v = bo.intersect(c).volume(); c.delete(); return v; };
+  const wallX = ro.x0 - Do.inner / 2, inside = ro.x0 - Do.inner - 2;
+  check('overlapping compartments merge into one pocket', at(wallX, ro.cy) < 1e-6 && at(inside, ro.cy) < 1e-6 && bo.status() === 'NoError',
+        'wall ' + at(wallX, ro.cy).toFixed(3) + ', beyond ' + at(inside, ro.cy).toFixed(3));
+  bo.delete();
 }
 
 console.log('pocket shape per compartment');
@@ -380,8 +390,42 @@ console.log('lid mirrors the base');
   const overPocket = lw.intersect(probe).volume();
   check('walls only: dividers in the lid, nothing over the compartments', sw > so + 0.5 && Math.abs(sw - sm) / sm < 0.15 && overPocket < 1e-6,
         'walls ' + sw.toFixed(1) + ', open ' + so.toFixed(1) + ', mirror ' + sm.toFixed(1) + ', over pocket ' + overPocket.toFixed(4));
+  // Thin walls: bands round each pocket, less than walls only but still closed over the pockets.
+  const th = JSON.parse(JSON.stringify(s)); th.lidInner.mode = 'thin';
+  const mt = CS.buildModel(th, { decor: false }), lt = toManifold(wasm, mt.parts.find(p => p.key === 'lid'));
+  const st = slab(lt, z2), overT = lt.intersect(probe).volume();
+  check('thin walls: lighter than walls only, more than open, nothing over the compartments', st > so + 0.5 && st < sw - 0.5 && overT < 1e-6,
+        'thin ' + st.toFixed(1) + ', walls ' + sw.toFixed(1) + ', open ' + so.toFixed(1));
+  check('the thin-walled lid is a valid solid', lt.status() === 'NoError');
+  lt.delete();
   probe.delete(); lw.delete(); lo.delete();
   check('the mirrored lid is a valid solid', m.parts.every(p => { const t = toManifold(wasm, p); const ok = t.status() === 'NoError'; t.delete(); return ok; }));
+}
+
+console.log('lid walls line up with the base');
+{
+  // Slices of the closed case just under the rim and just over the gap: no lid
+  // wall may hang over a base pocket, in any mode or layout.
+  const layouts = {
+    taper: s => CS.layout.sections(s.layout).forEach(c => { c.pocket.taper = 6; c.pocket.corner = 6; }),
+    shapes: s => { const c = CS.layout.sections(s.layout); c[0].item = 'capsule'; c[2].item = 'batteries'; },
+    moved: s => { const c = CS.layout.sections(s.layout); c[1].alignX = 'custom'; c[1].dx = -8; }
+  };
+  for (const [name, f] of Object.entries(layouts)) for (const mode of ['walls', 'thin', 'mirror']) {
+    const s = CS.defaults(); s.lip.enabled = false; s.lidInner.mode = mode; f(s);
+    const m = CS.buildModel(s, { decor: false }), D = m.D;
+    const base = toManifold(wasm, m.parts.find(p => p.key === 'base')), lid = toManifold(wasm, m.parts.find(p => p.key === 'lid'));
+    const bs = base.slice(D.zP - 1.2), ls = lid.slice(D.zP + s.lidInner.gap + 1.2);
+    const inner = wasm.CrossSection.square([D.IW - 1, D.IL - 1], true);
+    const off = ls.intersect(inner).subtract(bs.intersect(inner)).area();
+    check('lid walls sit on base walls: ' + name + ', ' + mode, off < 0.5, off.toFixed(2) + ' mm² over pockets');
+    [base, lid, bs, ls, inner].forEach(x => x.delete());
+  }
+  // Objects held at their own depth stand higher; the lid makes room for them.
+  const b = CS.defaults(); CS.layout.sections(b.layout)[0].item = 'bits';
+  const Db = CS.describe(b), sb = Db.rects[0].node;
+  check('a held object fits under the lid', sb._stickUp <= Db.Ht - b.headroom + 0.25 && !Db.warnings.some(w => /stands .* above its pocket/.test(w.msg)),
+        'stands ' + sb._stickUp.toFixed(1) + ' mm up, lid ' + Db.Ht.toFixed(1));
 }
 
 console.log('export');

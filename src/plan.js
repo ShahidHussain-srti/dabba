@@ -69,6 +69,8 @@ window.CS = window.CS || {};
     return side === 'left' || side === 'right' ? r.node.alignX !== 'stretch' : r.node.alignY !== 'stretch';
   }
 
+  var DRAG_MS = 600000;            // an undo step held open for the length of a drag
+
   function sx(t, x) { return t.ox + x * t.s; }
   function sy(t, y) { return t.oy - y * t.s; }
 
@@ -590,11 +592,22 @@ window.CS = window.CS || {};
     if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) < 3) return;
     var found = CS.layout.find(this.state.layout, d.id);
     if (!found) return;
-    if (!d.moved) { d.moved = true; this.hooks.beginEdit(); }
+    d.moved = true;
+    this.hooks.beginEdit(DRAG_MS);
     var s = found.node, step = e.shiftKey ? 0.1 : 0.5;
     var snap = function (v) { return Math.round(v / step) * step; };
-    s.dx = WB.tidy(WB.clamp(snap(d.dx0 + (p.x - d.x) / t.s), d.range.x[0], d.range.x[1]));
-    s.dy = WB.tidy(WB.clamp(snap(d.dy0 - (p.y - d.y) / t.s), d.range.y[0], d.range.y[1]));
+    // An axis it actually moves along becomes a custom position.
+    var mx = (p.x - d.x) / t.s, my = -(p.y - d.y) / t.s;
+    if (s.alignX !== 'custom' && Math.abs(mx) >= step / 2 && d.range.x[1] - d.range.x[0] > 1e-6) {
+      var sx0 = CS.layout.toCustom(s, d.rect, 'x');
+      d.dx0 += sx0; d.range.x = [d.range.x[0] + sx0, d.range.x[1] + sx0];
+    }
+    if (s.alignY !== 'custom' && Math.abs(my) >= step / 2 && d.range.y[1] - d.range.y[0] > 1e-6) {
+      var sy0 = CS.layout.toCustom(s, d.rect, 'y');
+      d.dy0 += sy0; d.range.y = [d.range.y[0] + sy0, d.range.y[1] + sy0];
+    }
+    if (s.alignX === 'custom') s.dx = WB.tidy(WB.clamp(snap(d.dx0 + mx), d.range.x[0], d.range.x[1]));
+    if (s.alignY === 'custom') s.dy = WB.tidy(WB.clamp(snap(d.dy0 + my), d.range.y[0], d.range.y[1]));
     this.describe();
     this.canvas.style.cursor = 'grabbing';
     this.draw();
@@ -901,7 +914,7 @@ window.CS = window.CS || {};
         if (node._sel !== h.prim) { node._sel = h.prim; self.hooks.primSelect(h.prim); }
         if (!src) return;
         var t0 = self.transform();
-        self.hooks.beginEdit();
+        self.hooks.beginEdit(DRAG_MS);
         self.frozen = { s: t0.s, ox: t0.ox, oy: t0.oy };
         var cx0 = sx(t0, cr.cx + q.x), cy0 = sy(t0, cr.cy + q.y);
         self.drag = { kind: 'prim', id: cr.id, prim: h.prim, handle: h.handle || 'move', x: p.x, y: p.y,
@@ -920,8 +933,8 @@ window.CS = window.CS || {};
         if (!rb) return;
         var t1 = self.transform();
         self.frozen = { s: t1.s, ox: t1.ox, oy: t1.oy };
-        self.drag = { kind: 'move', id: h.id, x: p.x, y: p.y, dx0: rb.dx, dy0: rb.dy, range: rb.range,
-                      moved: false };
+        self.drag = { kind: 'move', id: h.id, x: p.x, y: p.y, dx0: rb.dx, dy0: rb.dy, rect: rb,
+                      range: { x: rb.range.x.slice(), y: rb.range.y.slice() }, moved: false };
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
         return;
@@ -932,7 +945,7 @@ window.CS = window.CS || {};
         var s = found.node, t = self.transform();
         var r = self.D.rects.filter(function (q) { return q.id === h.id; })[0];
         var sd = sides(h.edge);
-        self.hooks.beginEdit();
+        self.hooks.beginEdit(DRAG_MS);
         self.frozen = { s: t.s, ox: t.ox, oy: t.oy };
         self.drag = {
           kind: 'resize', id: h.id, edge: h.edge, h: sd.h, v: sd.v, x: p.x, y: p.y,
@@ -948,6 +961,8 @@ window.CS = window.CS || {};
 
     canvas.addEventListener('pointermove', function (e) {
       var p = local(e);
+      // A drag is one undo step, however long it pauses; it closes on release.
+      if (self.drag && self.drag.kind !== 'move') self.hooks.beginEdit(DRAG_MS);
       if (self.drag && self.drag.kind === 'prim') { self._dragPrim(e, p); return; }
       if (self.drag && self.drag.kind === 'move') { self._dragMove(e, p); return; }
       if (self.drag) {
@@ -996,6 +1011,7 @@ window.CS = window.CS || {};
       if (e.pointerId != null && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
       self.draw();
       self.hooks.change(false);
+      if (self.hooks.endEdit) self.hooks.endEdit();
     };
     canvas.addEventListener('pointerup', end);
     canvas.addEventListener('pointercancel', end);

@@ -112,6 +112,7 @@
               <button value="center">Centre</button>
               <button value="end">Right</button>
               <button value="stretch" title="Grow the cavity to fill the space instead of thickening the wall">Fill</button>
+              <button value="custom" title="Place it yourself: drag it in the plan or type a position below">Custom</button>
             </div>
           </div>
           <div class="row">
@@ -121,6 +122,7 @@
               <button value="center">Centre</button>
               <button value="end">Front</button>
               <button value="stretch" title="Grow the cavity to fill the space instead of thickening the wall">Fill</button>
+              <button value="custom" title="Place it yourself: drag it in the plan or type a position below">Custom</button>
             </div>
           </div>
           <div class="row">
@@ -131,7 +133,9 @@
               <button class="ghost" id="btn-recentre" title="Put it back where the layout places it">Reset</button>
             </div>
           </div>
-          <p class="hint" id="pos-hint">Moved compartments can overlap their neighbours (the pockets merge) but stay inside the outer wall.</p>
+          <p class="hint" id="pos-hint">Dragging it in the plan or typing a position switches that direction to Custom, measured
+            from the middle of its slot. A moved compartment can overlap its neighbours (the pockets merge) but stays inside
+            the outer wall.</p>
           <div class="row">
             <span class="lbl">Add a compartment</span>
             <div class="seg small full" role="group" aria-label="Where to add" id="add-scope">
@@ -331,10 +335,11 @@
           <div class="seg small full" role="group" aria-label="Lid interior" data-bind="lidInner.mode">
             <button value="open">Open</button>
             <button value="walls" title="Dividers over the base's walls, so nothing slides from one compartment to another">Walls only</button>
+            <button value="thin" title="One thin divider between neighbouring compartments' areas; the outer wall closes the rest">Thin walls</button>
             <button value="mirror">Mirror compartments</button>
           </div>
         </div>
-        <div data-show="lidInner.mode:walls|mirror">
+        <div data-show="lidInner.mode:walls|thin|mirror">
           <div class="row num" data-num="lidInner.gap" data-min="0.2" data-max="6" data-step="0.1" data-unit="mm">Gap above the base walls</div>
         </div>
         <div data-show="lidInner.mode:mirror">
@@ -349,6 +354,10 @@
         <p class="hint" data-show="lidInner.mode:open">One open space under the lid.</p>
         <p class="hint" data-show="lidInner.mode:walls">Dividers rise from the lid top over every base wall, so nothing can slide
           from one compartment to another when it's closed. They stop the gap short of the base walls.</p>
+        <p class="hint" data-show="lidInner.mode:thin">One thin divider wherever two compartments' areas meet, as thick as
+          the inner-wall setting. Each compartment gets the whole rectangle it takes up in the layout, whatever its shape,
+          and the case's own wall closes any side with no neighbour. Compartments moved
+          over each other count as one area, with one wall round the lot. Lighter and quicker to print than walls only.</p>
         <p class="hint" data-show="lidInner.mode:mirror">Walls over the base's walls, with a matching pocket over every
           compartment. They stop the gap short of the base walls so the lid closes without rubbing; near the lip they
           also step back by the sideways sweep the lid makes as it swings.</p>
