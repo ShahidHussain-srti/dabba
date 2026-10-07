@@ -251,6 +251,20 @@ console.log('items');
           new Set(opts).size === opts.length && opts.every(k => CS.BATTERIES[k]) && opts[0] === 'AA' &&
           CS.itemParams(CS.newSection({ item: 'batteries' })).type === 'AA', opts.length + ' / ' + Object.keys(CS.BATTERIES).length);
   }
+  {
+    // Every pattern meets itself where it wraps round the case, at any size.
+    const names = ['knurl', 'pyramids', 'crosshatch', 'ribs', 'chevron', 'waves', 'hex', 'triangles', 'waffle', 'tiles',
+      'checker', 'bricks', 'herringbone', 'weave', 'diamondplate', 'scales', 'dimples', 'studs', 'mesh', 'rings',
+      'bubbles', 'voronoi', 'crystal', 'leather', 'wood', 'topo', 'noise'].filter(n => CS.texPeriod(n) != null);
+    const bad = [];
+    for (const n of names) for (const units of [20, 33, 60, 77, 140]) {
+      const period = units * 4, f = CS.texSampler(n, 4, 0, period, 0);
+      let worst = 0;
+      for (let y = 0; y < 40; y += 0.73) worst = Math.max(worst, Math.abs(f(0, y) - f(period - 0.01, y)));
+      if (worst > 0.05) bad.push(n + '@' + units + ':' + worst.toFixed(2));
+    }
+    check('textures are seamless where they wrap', !bad.length, bad.slice(0, 6).join(' '));
+  }
   check('standing batteries take the compartment\'s depth', bt.prims.length === 6 && bt.prims.every(q => q.depth == null) && bt.h === 50.5);
   {
     const bs = CS.defaults(), b0 = CS.layout.sections(bs.layout)[0];

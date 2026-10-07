@@ -621,14 +621,28 @@ window.CS = window.CS || {};
     var s = found.node, step = e.shiftKey ? 0.1 : 0.5;
     var snap = function (v) { return Math.round(v / step) * step; };
     // An axis it actually moves along becomes a custom position.
-    var mx = (p.x - d.x) / t.s, my = -(p.y - d.y) / t.s;
+    var mx = (p.x - d.x) / t.s, my = -(p.y - d.y) / t.s, refit = false;
     if (s.alignX !== 'custom' && Math.abs(mx) >= step / 2 && d.range.x[1] - d.range.x[0] > 1e-6) {
+      refit = refit || s.alignX === 'stretch';
       var sx0 = CS.layout.toCustom(s, d.rect, 'x');
       d.dx0 += sx0; d.range.x = [d.range.x[0] + sx0, d.range.x[1] + sx0];
     }
     if (s.alignY !== 'custom' && Math.abs(my) >= step / 2 && d.range.y[1] - d.range.y[0] > 1e-6) {
+      refit = refit || s.alignY === 'stretch';
       var sy0 = CS.layout.toCustom(s, d.rect, 'y');
       d.dy0 += sy0; d.range.y = [d.range.y[0] + sy0, d.range.y[1] + sy0];
+    }
+    if (refit) {
+      // Out of Fill it is back to its own size: measure it again, as it sat
+      // when the drag began (less any offset already applied this drag).
+      this.describe();
+      var nr = this.D.rects.filter(function (q) { return q.id === d.id; })[0];
+      if (nr) {
+        var ox0 = (nr.dx || 0) - d.dx0, oy0 = (nr.dy || 0) - d.dy0;
+        d.rect = Object.assign({}, nr, { x0: nr.x0 - ox0, x1: nr.x1 - ox0, cx: nr.cx - ox0,
+                                         y0: nr.y0 - oy0, y1: nr.y1 - oy0, cy: nr.cy - oy0 });
+        d.range = { x: nr.range.x.slice(), y: nr.range.y.slice() };
+      }
     }
     var cx = s.alignX === 'custom', cy = s.alignY === 'custom', R = d.rect;
     var sn = { x: false, y: false, dx: 0, dy: 0 }, lines = null;

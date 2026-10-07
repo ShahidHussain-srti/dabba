@@ -91,7 +91,8 @@ window.CS = window.CS || {};
       segments: true },
     { key: 'batteries', name: 'Battery holder', group: 'Batteries & small parts',
       hint: 'A grid of batteries, standing or lying. Batteries are a standard size, so each hole is ' +
-            'as deep as the base allows: the base share of the height sets it, and the lid takes the rest.',
+            'automatic: as deep as the battery, up to what the base allows (the base share of the height ' +
+            'sets that), and the lid takes the rest.',
       params: [{ key: 'type', label: 'Battery', options: BATTERY_ORDER.map(batteryOption), def: 'AA' },
                ['rows', 'Rows', 2, 1, 20, 1], ['cols', 'Columns', 4, 1, 30, 1],
                { key: 'lying', label: 'Orientation', options: [['no', 'Standing'], ['yes', 'Lying']] },

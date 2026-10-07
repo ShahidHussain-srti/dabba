@@ -452,8 +452,8 @@
     $('#sec-depth-now').textContent = s._depth != null ? s._depth.toFixed(2) + ' mm' : '';
     var up = (s._shape ? s._shape.h : s.h) - (s._depth || 0);
     $('#sec-depth-hint').textContent = (fixed
-      ? 'Batteries are a standard size, so the holes go as deep as the base allows (' + D.Hb.toFixed(1) +
-        ' mm): set the base share of the height to change it.'
+      ? 'Batteries are a standard size, so the holes are automatic: ' + (s._depth || 0).toFixed(1) + ' mm deep, ' +
+        ((s._depth || 0) < D.Hb - 1e-6 ? 'the height of the battery.' : 'as deep as the base allows; set the base share of the height to change it.')
       : auto
       ? (state.seat === 'flush' ? 'Matched to the object, up to the full ' + D.Hb.toFixed(1) + ' mm the base allows.'
                                 : 'Reaches the floor: the full ' + D.Hb.toFixed(1) + ' mm of the base.')
@@ -1042,9 +1042,9 @@
       face.invalidateBorder();
       refresh();
       setPlanMode(state.activeFace);
-    } else if (path.indexOf('~.border') === 0 || /^(outer|walls|layout|fit)/.test(path)) {
-      face.invalidateBorder();
     }
+    // Border and size edits need no invalidating: the ring's cache key holds
+    // them, and leaving the cache lets a drag reuse the last ring.
     refreshValues(el);
     apply();
   }
@@ -1261,7 +1261,8 @@
       fr.onload = function () {
         try {
           var parsed = JSON.parse(fr.result);
-          loadAsStep(parsed, afterLoad);
+          session.duplicate();                 // a new design; the one on screen stays in the list
+          loadAsStep(parsed, function () { state.name = session.uniqueName(state.name); afterLoad(); });
         } catch (err) {
           showWarnings([{ level: 'bad', msg: 'That file could not be loaded: ' + err.message }]);
         }
@@ -1305,11 +1306,12 @@
   }
   function newDesign() {
     session.saveNow();
+    session.startNew();                     // first, so the open design's name counts as taken
     toDefaults();
     state.name = session.uniqueName(CS.defaults().name);
     afterLoad();
     if (undoHistory) undoHistory.clear();
-    session.startNew();
+    session.settled();
     setTimeout(function () { session.settled(); }, 0);
   }
   function duplicateDesign() {
@@ -1503,7 +1505,11 @@
       d.selected = CS.layout.sections(d.layout)[0].id;
     }
     var secs = CS.layout.sections(d.layout), faces = [d.faces.lid, d.faces.base];
-    faces.forEach(function (f) { f.texts = f.texts.slice(0, MAX_ITEMS); f.arts = f.arts.slice(0, MAX_ITEMS); });
+    faces.forEach(function (f) {
+      f.texts = f.texts.slice(0, MAX_ITEMS); f.arts = f.arts.slice(0, MAX_ITEMS);
+      f.textIdx = WB.clamp(f.textIdx || 0, 0, Math.max(0, f.texts.length - 1));
+      f.artIdx = WB.clamp(f.artIdx || 0, 0, Math.max(0, f.arts.length - 1));
+    });
     var texts = [].concat(faces[0].texts, faces[1].texts), arts = [].concat(faces[0].arts, faces[1].arts);
     WB.fieldLimits(document, ['f-inlayDepth', 'f-reliefHeight']).forEach(function (L) {
       var p = L.path;
@@ -1600,12 +1606,16 @@
     // loaded is not the link's fault and must not load a second time.
     WB.shareDecode(location.hash).then(function (p) {
       if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error('not a design');
+      if (p.state != null && (typeof p.state !== 'object' || Array.isArray(p.state))) throw new Error('not a design');
       // A short link holds only the changes from the defaults.
       if (p.diff) p.state = WB.sharePatch(JSON.parse(CS.serialize(CS.defaults())), p.state || {});
       return p;
     }).then(function (p) {
       history.replaceState(null, '', WB.shareBase());   // later refreshes use the session
+      // Into a tab that already has a design: a new one, so that one stays in the list.
+      if (inTab) session.duplicate();
       loadPayload(p, function () {
+        if (inTab) state.name = session.uniqueName(state.name);
         done();
         var n = p.picturesLeftOut;
         WB.sharePopup({ title: 'Opened a shared design', kind: n ? 'warn' : 'ok', body: n
@@ -1628,7 +1638,10 @@
   function clearSession() { session.clear(); }
   /* Returns true when a stored design is being restored. */
   function restoreSession(done) { return session.restore(done); }
-  var session = new WB.Session({ key: 'dabba.session.v1', build: buildPayload, load: loadPayload });
+  var session = new WB.Session({ key: 'dabba.session.v1', build: buildPayload, load: loadPayload,
+    // A copy made because another tab had written the design meanwhile.
+    rename: function (name) { state.name = name; refreshValues(); },
+    failed: function (msg) { notice('warn', msg); } });
   var storageOK = session.ok;
   function persist() { session.save(); }
 

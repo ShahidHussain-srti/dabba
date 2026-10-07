@@ -167,12 +167,12 @@ window.CS = window.CS || {};
        of late wood, as on brushed or weathered timber, with fine fibres along
        the grain and now and then a knot the rings swirl round. */
     wood: function (x, y, W) {
-      var a = wf(0.07, W), c = wf(0.05, W), b = wf(0.3, W), fq = wf(0.6, W), P = 9;
+      var a = wf(0.07, W), c = wf(0.05, W), e = wf(0.08, W), b = wf(0.3, W), fq = wf(0.6, W), P = 9;
       var h = 1.8 + 5 * Math.abs(fbm(x * a[0], y * 0.04 + 0.37, 2, a[1]) - 0.5);   // the cut's distance from the axis
       var dy = P * (frac((y - 2.2 * (fbm(x * c[0], 5.1, 2, c[1]) - 0.5)) / P) - 0.5);
       // The log tapers, so rings grow along it and the cut slips out of them
       // in nested arches; the taper swells and eases along the board.
-      var taper = 3.6 * (fbm(x * c[0] * 1.6, 8.3, 2, c[1] * 1.6) - 0.5);
+      var taper = 3.6 * (fbm(x * e[0], 8.3, 2, e[1]) - 0.5);
       var r = Math.sqrt(dy * dy + h * h) + taper + 0.25 * fbm(x * b[0], y * 0.7, 2, b[1]);
       var kn = woodKnot(x, y, W);
       r += 2 * Math.exp(-(kn / 1.7) * (kn / 1.7));                    // rings bend round a knot

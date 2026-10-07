@@ -288,7 +288,8 @@ window.CS = window.CS || {};
   FaceView.prototype.footprint = function (b, t) {
     var isText = b.key.indexOf('text') === 0;
     var w = isText ? b.w - 6 : b.w, h = isText ? b.h - 4 : b.h;
-    var off = alignOffset(this.el(b.key), b.key, b);
+    var al = isText && this.el(b.key) ? this.el(b.key).align : 'center';
+    var off = al === 'left' ? w / 2 : al === 'right' ? -w / 2 : 0;      // from the anchor to the ink's middle
     var c = Math.cos(b.rot), sn = Math.sin(b.rot);
     var ex = (Math.abs(c) * w + Math.abs(sn) * h) / 2, ey = (Math.abs(sn) * w + Math.abs(c) * h) / 2;
     var cx = (b.cx + off * c - t.ox) / t.s, cy = (t.oy - b.cy - off * sn) / t.s;
