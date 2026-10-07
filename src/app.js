@@ -162,6 +162,7 @@
     CS.assets.images = Object.assign({}, snap.assets.images);
     CS.assets.drawings = Object.assign({}, snap.assets.drawings);
     CS.assets.texture = snap.assets.texture || null;
+    dropDrags();
     face.invalidateBorder();
     refresh();
     apply();
@@ -174,6 +175,7 @@
   /* Load a design as one undo step. Loading can wait on pictures, so the step
      stays open until it is in. */
   function loadAsStep(payload, after) {
+    if (undoHistory) undoHistory.commit();             // close any edit still pending first
     beginEdit(600000);
     loadPayload(payload, function () { after(); if (undoHistory) undoHistory.commit(); });
   }
@@ -298,7 +300,7 @@
       else el.value = v;
     });
     var sn = sectionNow();
-    if (sn) paintFill(sn);
+    if (sn) { paintFill(sn); paintPosition(sn); }
   }
 
   function refresh() {
@@ -927,11 +929,26 @@
     [['~s.w', 'x', 'w'], ['~s.l', 'y', 'l']].forEach(function (a) {
       var el = $('input[data-bind="' + a[0] + '"]');
       if (!el) return;
-      var filled = s['align' + a[1].toUpperCase()] === 'stretch';
+      // Fill only sets the size of shapes that grow with it (box, oval).
+      var filled = s['align' + a[1].toUpperCase()] === 'stretch' && !!(s._shape && s._shape.fill);
       el.disabled = filled;
       el.title = filled ? 'Set by Fill: the compartment takes the space its slot has. Turn Fill off to set it.' : '';
       el.closest('label').classList.toggle('locked', filled);
       if (filled && s._size && document.activeElement !== el) el.value = Math.round(s._size[a[2]] * 10) / 10;
+    });
+  }
+
+  /* The position boxes measure from the middle of the slot (as Custom does),
+     so an aligned compartment shows where it actually sits and a nudge moves
+     it on from there. */
+  function paintPosition(s) {
+    var r = rectNow(s);
+    if (!r) return;
+    [['~s.dx', 'x'], ['~s.dy', 'y']].forEach(function (a) {
+      var el = $('input[data-bind="' + a[0] + '"]');
+      if (!el || document.activeElement === el || s['align' + a[1].toUpperCase()] === 'custom') return;
+      var mid = a[1] === 'x' ? (r.slot.x0 + r.slot.x1) / 2 : (r.slot.y0 + r.slot.y1) / 2;
+      el.value = Math.round(((a[1] === 'x' ? r.cx : r.cy) - mid) * 10) / 10;
     });
   }
 
@@ -1222,7 +1239,14 @@
     });
   }
 
+  // A drag in progress belongs to the design it started on.
+  function dropDrags() {
+    if (plan) { plan.drag = null; plan.frozen = null; }
+    if (face) { face.drag = null; face.resize = null; }
+  }
+
   function afterLoad() {
+    dropDrags();
     face.selected = null;
     face.invalidateBorder();
     refresh();
@@ -1271,6 +1295,7 @@
       d.lidInner.mode = 'walls'; d.lidInner.depth = 'mirror';
     }
     if (d.lidInner.depth !== 'fit') d.lidInner.depth = 'mirror';   // 'full' and anything older
+    if (d.activeFace !== 'lid' && d.activeFace !== 'base') d.activeFace = 'lid';
     if (ps.texture && ps.texture.border != null && !ps.texture.borders) {
       var b0 = ps.texture.border;
       d.texture.borders = { base: { bottom: b0, top: b0, face: b0 }, lid: { bottom: b0, top: b0, face: b0 } };
@@ -1397,8 +1422,12 @@
 
   /* Opens a design from the link, if it carries one. Returns whether it does;
      done() runs once the design is in place. */
-  function openSharedLink(done) {
+  /* inTab: a link pasted into an open tab; if it fails, the design on screen
+     stays as it is rather than falling back to the saved session. */
+  function openSharedLink(done, inTab) {
     if (location.hash.indexOf('#d=') !== 0) return false;
+    // Only a link that won't decode counts as damaged; a problem after it has
+    // loaded is not the link's fault and must not load a second time.
     WB.shareDecode(location.hash).then(function (p) {
       history.replaceState(null, '', WB.shareBase());   // later refreshes use the session
       loadPayload(p, function () {
@@ -1409,11 +1438,11 @@
                ' that links cannot carry. Ask the sender for the design file to get ' + (n === 1 ? 'it' : 'them') + '.' }]
           : ['Changes you make stay in your own copy.'] });
       });
-    }).catch(function (err) {
+    }, function (err) {
       history.replaceState(null, '', WB.shareBase());
       WB.sharePopup({ kind: 'warn', title: 'That link could not be opened',
         body: ['It looks damaged or cut short. Ask for it again, or for the design file.'] });
-      if (!restoreSession(done)) done();
+      if (inTab || !restoreSession(done)) done();
     });
     return true;
   }
@@ -1508,8 +1537,9 @@
     // A link pasted into a tab that already has the app open.
     window.addEventListener('hashchange', function () {
       if (location.hash.indexOf('#d=') !== 0) return;
+      if (undoHistory) undoHistory.commit();           // close any edit still pending first
       beginEdit(600000);
-      openSharedLink(function () { afterLoad(); if (undoHistory) undoHistory.commit(); });
+      openSharedLink(function () { afterLoad(); if (undoHistory) undoHistory.commit(); }, true);
     });
     var restoring = openSharedLink(afterLoad) ||
       restoreSession(function (note) {

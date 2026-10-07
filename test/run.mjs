@@ -125,6 +125,7 @@ function variants() {
                     CS.newPrim('capsule', { x: -30, y: -20, w: 50, l: 12, rot: -15 }), CS.newPrim('hex', { x: 45, y: -18, w: 12 })];
   secs2[1].item = 'cards'; secs2[1].params = { cards: { type: 'SD', count: 5 } };
   secs2[2].item = 'batteries'; secs2[2].params = { batteries: { type: '18650', rows: 1, cols: 2 } };
+  it2.split = 0.5;   // standing 18650s, half held, need the lid to take the rest
   out.push(['custom shapes, SD slots, standing 18650', it2]);
 
   const tr = CS.defaults();
@@ -421,11 +422,14 @@ console.log('lid walls line up with the base');
     check('lid walls sit on base walls: ' + name + ', ' + mode, off < 0.5, off.toFixed(2) + ' mm² over pockets');
     [base, lid, bs, ls, inner].forEach(x => x.delete());
   }
-  // Objects held at their own depth stand higher; the lid makes room for them.
+  // Objects held at their own depth stand higher than the base; when the lid
+  // can't take them the warning names a base share that works, and it does.
   const b = CS.defaults(); CS.layout.sections(b.layout)[0].item = 'bits';
-  const Db = CS.describe(b), sb = Db.rects[0].node;
-  check('a held object fits under the lid', sb._stickUp <= Db.Ht - b.headroom + 0.25 && !Db.warnings.some(w => /stands .* above its pocket/.test(w.msg)),
-        'stands ' + sb._stickUp.toFixed(1) + ' mm up, lid ' + Db.Ht.toFixed(1));
+  const Db = CS.describe(b), wb = Db.warnings.find(w => /stands .* above its pocket/.test(w.msg));
+  const share = wb && +(wb.msg.match(/base share to (\d+)%/) || [])[1];
+  let fixed = false;
+  if (share) { b.split = share / 100; fixed = !CS.describe(b).warnings.some(w => /stands .* above its pocket/.test(w.msg)); }
+  check('a held object too tall for the lid is flagged with a base share that fits', !!wb && fixed, wb ? wb.msg.slice(0, 120) : 'no warning');
 }
 
 console.log('export');

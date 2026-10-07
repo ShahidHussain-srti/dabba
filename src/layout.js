@@ -136,21 +136,16 @@ window.CS = window.CS || {};
     var warn = [];
 
     var fit = Math.max(0, state.fit);
-    var hmax = 0, held = 0;
+    var hmax = 0;
     // What each compartment holds, as pocket shapes (items.js).
     secs.forEach(function (s) {
       if (!s.item) s.item = s.shape === 'round' ? 'round' : 'box';
       s._shape = CS.itemShape(s, fit);
       if (s._shape.h > hmax) hmax = s._shape.h;
-      // Shapes held at their own depth (standing batteries, bits) stand that
-      // much higher out of the base, into the lid.
-      s._shape.prims.forEach(function (q) {
-        if (q.depth != null && isFinite(q.depth)) held = Math.max(held, s._shape.h - Math.max(lh, q.depth));
-      });
     });
 
-    var tray0 = state.build === 'tray', room = Math.max(0, state.headroom);
-    var autoHi = snap(Math.max(hmax + room, tray0 || !held ? 0 : (held + room) / Math.max(0.15, 1 - state.split)), 'up');
+    // At least a hair of room, so a design with no headroom still closes.
+    var autoHi = snap(hmax + Math.max(0.1, state.headroom), 'up');
     var Hi = state.interior.auto ? autoHi : snap(Math.max(state.interior.height, lh * 4));
     if (!state.interior.auto && Hi < autoHi - 1e-6) {
       warn.push({ level: 'warn', msg: 'The interior is ' + Hi.toFixed(1) + ' mm tall but the tallest object needs ' +
@@ -195,8 +190,16 @@ window.CS = window.CS || {};
       if (tray && stickUp > 0.05) {
         warn.push({ level: 'warn', msg: label(s, secs) + ' stands ' + stickUp.toFixed(1) + ' mm above the rim of the tray.' });
       } else if (!tray && stickUp > Ht - 0.1 + 1e-6) {
+        // An object held above the floor (standing batteries, bits) needs the
+        // lid to take the rest: say what base share would do it. The base
+        // height rounds to the nearest layer, so leave half a layer spare.
+        // An object already at the floor gains nothing from a smaller base.
+        var shallowest = sh.prims.length ? Math.min.apply(null, sh.prims.map(function (q) { return q._depth; })) : s._depth;
+        var HbMax = Math.floor((Hi - stickUp - 0.1) / lh + 1e-9) * lh;
+        var share = shallowest < Hb - 1e-6 && HbMax >= shallowest - 1e-6 ? Math.floor((HbMax + lh * 0.49) / Hi * 100) : 0;
         warn.push({ level: 'bad', msg: label(s, secs) + ' stands ' + stickUp.toFixed(1) + ' mm above its pocket but the lid only has ' +
-          Ht.toFixed(1) + ' mm of room. Deepen the pocket or give the lid a bigger share.' });
+          Ht.toFixed(1) + ' mm of room. ' + (share >= 15 ? 'Set the base share to ' + share + '% or less, deepen the pocket, or raise the interior height.'
+                                                       : 'Deepen the pocket or raise the interior height.') });
       }
     });
 

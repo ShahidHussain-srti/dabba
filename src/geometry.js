@@ -1127,7 +1127,16 @@ window.CS = window.CS || {};
         dl = Math.max(gap + 0.6, up);
         if (dl > D.Ht - 0.3) dl = D.Ht + 1;
       }
-      return move(S, S.k(lines[i].extrude(dl + 1)), 0, 0, D.zP - 1);
+      // A compartment of several shapes (batteries, bits, cards) gets one
+      // opening over its whole area: objects standing out of tight holes
+      // would catch on them as the lid swings, and thin webs between them
+      // don't belong in the lid.
+      var outline = lines[i];
+      if (!(s._shape && s._shape.fill)) {
+        var m = s._margin || 0, x0 = rc.x0 - m, x1 = rc.x1 + m, y0 = rc.y0 - m, y1 = rc.y1 + m;
+        outline = S.k(outline.add(S.k(new WASM.CrossSection([[[x0, y0], [x1, y0], [x1, y1], [x0, y1]]]))));
+      }
+      return move(S, S.k(outline.extrude(dl + 1)), 0, 0, D.zP - 1);
     });
     return union(S, [lid, sub(S, filler, union(S, pockets))]);
   }
