@@ -403,8 +403,13 @@
         <div data-hide="clasp.type:none">
           <div class="row num" data-num="clasp.count" data-min="1" data-max="6" data-step="1" data-unit="">Count</div>
           <div class="row num" data-num="clasp.width" data-min="4" data-max="60" data-step="0.5" data-unit="mm">Width</div>
-          <div data-show="clasp.type:snap|press">
+          <div data-show="clasp.type:snap">
             <div class="row num" data-num="clasp.thickness" data-min="0.8" data-max="4" data-step="0.1" data-unit="mm">Tab thickness</div>
+          </div>
+          <div data-show="clasp.type:press">
+            <div class="row num" data-num="clasp.leverT" data-min="1.2" data-max="6" data-step="0.1" data-unit="mm">Lever thickness</div>
+          </div>
+          <div data-show="clasp.type:snap|press">
             <div class="row num" data-num="clasp.reach" data-min="2" data-max="30" data-step="0.5" data-unit="mm">Reach below the rim</div>
             <div class="row num" data-num="clasp.catch" data-min="0.3" data-max="3" data-step="0.05" data-unit="mm">Hook depth</div>
           </div>

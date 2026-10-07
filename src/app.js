@@ -184,6 +184,40 @@
     undoHistory.bind();
   }
 
+  /* ── reset a section ────────────────────────────────────────────────
+     Every setting the panel shows goes back to its default. What a
+     compartment is (its name, what it holds, its size and custom shapes) and
+     what you typed or uploaded are kept: those are yours, not settings. */
+  var KEEP = /^~s\.(name|item|w|l|h|params|prims)\b|^~t\.(content)$|^~a\.(source|id)$|^name$/;
+  function defaultFor(path) {
+    var src, p = path;
+    if (p.indexOf('~s.') === 0) { src = CS.newSection(); p = p.slice(3); }
+    else if (p.indexOf('~t.') === 0) { src = CS.newText(); p = p.slice(3); }
+    else if (p.indexOf('~a.') === 0) { src = CS.newArt(); p = p.slice(3); }
+    else if (p.indexOf('~.') === 0) { src = CS.faceDefaults(state.activeFace); p = p.slice(2); }
+    else src = CS.defaults();
+    return WB.get(src, p);
+  }
+  function resetPanel(panel) {
+    var paths = WB.panelPaths(panel).filter(function (p) { return !KEEP.test(p) && getV(p) !== undefined; });
+    var changed = paths.filter(function (p) {
+      var d = defaultFor(p);
+      return d !== undefined && JSON.stringify(d) !== JSON.stringify(getV(p));
+    });
+    var s = sectionNow(), depthToo = panel.id === 'p-compartment' && s && s.depth != null;
+    if (!changed.length && !depthToo) return;
+    beginEdit(0);
+    changed.forEach(function (p) {
+      var d = defaultFor(p);
+      setV(p, d && typeof d === 'object' ? JSON.parse(JSON.stringify(d)) : d);
+    });
+    if (depthToo) s.depth = null;                  // pocket depth back to automatic
+    if (panel.id === 'p-decor' || panel.id === 'p-colours') face.invalidateBorder();
+    itemSig = '';
+    refresh();
+    apply();
+  }
+
   /* ── declarative two-way binding ───────────────────────────────── */
   function bind() { $$('[data-bind]').forEach(bindEl); }
 
@@ -1401,6 +1435,7 @@
     bind();
     bindScrubbing();
     bindHistory();
+    WB.addResetButtons($$('.sidebar .panel'), resetPanel);
     bindSections();
     bindLists();
     chrome();

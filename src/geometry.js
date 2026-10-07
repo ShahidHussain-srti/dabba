@@ -314,7 +314,7 @@ window.CS = window.CS || {};
        not across them (the lid prints upside down, the web flat). The web
        sits high so the lever below it is long and the rock is small, and the
        press side stands off the wall enough to make that rock. */
-    var pr = { t: WB.clamp(C.thickness, 0.8, 5), e: WB.clamp(C.catch, 0.3, 3), cl: WB.clamp(C.clearance, 0.05, 0.8) };
+    var pr = { t: WB.clamp(C.leverT != null ? C.leverT : 3, 1.2, 6), e: WB.clamp(C.catch, 0.3, 3), cl: WB.clamp(C.clearance, 0.05, 0.8) };
     pr.reach = WB.clamp(C.reach, 2, Math.max(2, D.zP - D.eb - 1));
     pr.zb = D.zP - pr.reach;
     pr.gapAt = pr.reach * D.tanO;

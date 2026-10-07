@@ -61,7 +61,8 @@ locked until you turn Fill off.
   all adjustable.
 - Clasps: snap hooks, magnets, snap bumps, a hook latch on its own pin, a swing hook like
   the ones on old jewellery boxes, or a press latch: a stiff tab hung from the lid on a thin
-  web, which you press at the top to lift its hook out of the base. The web is both hinge
+  web, which you press at the top to lift its hook out of the base. Its lever thickness is
+  adjustable (3 mm by default). The web is both hinge
   and spring, and it prints flat so it bends along its layers rather than across them. The
   hook latch and swing hook print as a separate small piece.
 
@@ -86,7 +87,8 @@ to add a compartment along a whole side, and Delete to remove one. The 3D view c
 or laid out for printing. Number boxes work like Unity's inspector: type a value, or drag
 sideways on the label or the edge of the box (Shift for bigger steps, Alt for finer).
 
-`⌘Z` / `Ctrl+Z` undoes anything, and your work survives a refresh. **Save** and **Load** keep
+Each section of the sidebar has a ↺ button that puts its settings back to their defaults,
+keeping your names, sizes, text and pictures. `⌘Z` / `Ctrl+Z` undoes anything, and your work survives a refresh. **Save** and **Load** keep
 a design as a `.case.json` file.
 
 **Share** copies a link that opens your design for whoever you send it to. Everything is
