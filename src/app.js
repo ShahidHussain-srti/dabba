@@ -1446,6 +1446,7 @@
     });
 
     if (!CS.layout.find(d.layout, d.selected)) d.selected = CS.layout.sections(d.layout)[0].id;
+    sanitize(d);
 
     Object.keys(state).forEach(function (k) { if (!(k in d)) delete state[k]; });
     Object.keys(d).forEach(function (k) { state[k] = d[k]; });
@@ -1463,6 +1464,7 @@
       }
     });
 
+    jobs = jobs.filter(function (j) { return WB.isImageData(j.data); });   // inline pictures only
     var pending = jobs.length;
     if (!pending) { done(); return; }
     jobs.forEach(function (job) {
@@ -1477,6 +1479,57 @@
       };
       img.onerror = function () { if (!--pending) done(); };
       img.src = job.data;
+    });
+  }
+
+  /* A setting path inside each object of a list kept within its field's
+     limits: 'pocket.corner' on every compartment, say. */
+  function clampAll(list, sub, L, fresh) {
+    var parts = sub.split('.'), key = parts.pop(), at = parts.join('.');
+    list.forEach(function (o) {
+      var tgt = at ? WB.get(o, at) : o;
+      WB.clampField(tgt, key, L.min, L.max, fresh ? WB.get(fresh, sub) : undefined);
+    });
+  }
+
+  /* A design from a file, a link or storage, kept to what the app can build:
+     hex colours only, every number inside its field's limits, and lists of a
+     sane length, so a crafted link can't hang the page (and stay saved). */
+  var MAX_SECTIONS = 120, MAX_ITEMS = 40;
+  function sanitize(d) {
+    WB.cleanColours(d, CS.defaults());
+    if (CS.layout.sections(d.layout).length > MAX_SECTIONS) {
+      d.layout = CS.defaults().layout;
+      d.selected = CS.layout.sections(d.layout)[0].id;
+    }
+    var secs = CS.layout.sections(d.layout), faces = [d.faces.lid, d.faces.base];
+    faces.forEach(function (f) { f.texts = f.texts.slice(0, MAX_ITEMS); f.arts = f.arts.slice(0, MAX_ITEMS); });
+    var texts = [].concat(faces[0].texts, faces[1].texts), arts = [].concat(faces[0].arts, faces[1].arts);
+    WB.fieldLimits(document, ['f-inlayDepth', 'f-reliefHeight']).forEach(function (L) {
+      var p = L.path;
+      if (p.indexOf('~s.') === 0) clampAll(secs, p.slice(3), L, CS.newSection());
+      else if (p.indexOf('~t.') === 0) clampAll(texts, p.slice(3), L, CS.newText());
+      else if (p.indexOf('~a.') === 0) clampAll(arts, p.slice(3), L, CS.newArt());
+      else if (p.indexOf('~.') === 0) clampAll(faces, p.slice(2), L, CS.faceDefaults('lid'));
+      else clampAll([d], p, L, CS.defaults());
+    });
+    secs.forEach(function (s) {
+      // What each one holds, inside the limits its own fields have.
+      Object.keys(s.params || {}).forEach(function (key) {
+        var it = CS.itemByKey(key), pp = s.params[key];
+        if (!pp || typeof pp !== 'object' || it.key !== key) { delete s.params[key]; return; }
+        (it.params || []).forEach(function (sp) { if (Array.isArray(sp)) WB.clampField(pp, sp[0], sp[3], sp[4], sp[2]); });
+        if (Array.isArray(pp.segs)) {
+          pp.segs = pp.segs.filter(function (q) { return q && typeof q === 'object'; }).slice(0, 12);
+          pp.segs.forEach(function (q) { WB.clampField(q, 'd', 1, 400, 20); WB.clampField(q, 'len', 1, 800, 20); });
+        }
+      });
+      s.prims = s.prims.filter(function (q) { return q && typeof q === 'object'; }).slice(0, MAX_ITEMS);
+      s.prims.forEach(function (q) {
+        WB.clampField(q, 'w', 1, 400, 20); WB.clampField(q, 'l', 1, 400, 20);
+        WB.clampField(q, 'x', -400, 400, 0); WB.clampField(q, 'y', -400, 400, 0);
+        WB.clampField(q, 'rot', -360, 360, 0); WB.clampField(q, 'depth', 0.1, 300, null);
+      });
     });
   }
 

@@ -96,6 +96,10 @@ to add a compartment along a whole side, and Delete to remove one. The 3D view c
 or laid out for printing. Number boxes work like Unity's inspector: type a value, or drag
 sideways on the label or the edge of the box (Shift for bigger steps, Alt for finer).
 
+**Designs** lists every design kept in this browser: start a new one, carry on in a copy, open
+another or delete it. Each tab works on its own design, so two tabs never write over each
+other; a new tab picks up your latest design unless another tab has it open.
+
 Each section of the sidebar has a ↺ button that puts its settings back to their defaults,
 keeping your names, sizes, text and pictures. `⌘Z` / `Ctrl+Z` undoes anything, and your work survives a refresh. **Save** and **Load** keep
 a design as a `.case.json` file.
@@ -156,6 +160,16 @@ The tests check the physical things: every part is a valid closed solid, the bas
 don't overlap when shut, the lid swings a full 180° without hitting anything, latch hooks
 clear both halves, printed pieces don't touch, and the 3MF reads back with the right
 colours.
+
+## Privacy
+
+There are no accounts, cookies, analytics or trackers, and the page loads nothing from
+other sites. Designs and pictures stay in your browser's local storage, which the app
+only uses to keep your work, and leave it only as files you save or export. A share link
+holds the design after the `#`, which browsers don't send to the server, so it goes only
+where you send it (and anyone with it can read it); pictures never go in links. The site
+is hosted on GitHub Pages, where GitHub keeps standard request logs under its own privacy
+statement. Designs → Delete all saved data removes everything the app has kept.
 
 ## License
 
