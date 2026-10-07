@@ -31,8 +31,28 @@ window.CS = window.CS || {};
 
   /* Every element on one face, colour-separated and clipped to the flat area.
      The underside is mirrored so its artwork reads correctly once the case is
-     turned over. Where elements overlap, the one drawn on top keeps the pixel. */
+     turned over. Where elements overlap, the one drawn on top keeps the pixel.
+
+     Rendering text and pictures and measuring borders is most of a rebuild's
+     raster work, so each face's result is kept until something that feeds it
+     changes: the face's own settings, its outline, the grid, or a picture.
+     The masks are never changed after this, so sharing them is safe. */
+  var faceCache = {};
+  function bitmapRev(c) {
+    if (!c) return 0;
+    if (!c._rev) c._rev = Date.now() + Math.random();
+    return c._rev;
+  }
   CS.faceElements = function (face, fo, g, mirror) {
+    var key = JSON.stringify([face, fo, g.cols, g.rows, g.ppmm, !!mirror,
+      (face.arts || []).map(function (a) { return [bitmapRev(WB.assets.images[a.id]), bitmapRev(WB.assets.drawings[a.id])]; })]);
+    var slot = mirror ? 'base' : 'lid';
+    if (faceCache[slot] && faceCache[slot].key === key) return faceCache[slot].out;
+    var out = renderFace(face, fo, g, mirror);
+    faceCache[slot] = { key: key, out: out };
+    return out;
+  };
+  function renderFace(face, fo, g, mirror) {
     var out = { list: [], all: null, raw: [] };
     if (!face.enabled) return out;
     var plate = CS.faceMask(fo, g);
@@ -59,6 +79,6 @@ window.CS = window.CS || {};
     out.list = out.list.filter(function (e) { return e.mask && !WB.mask.empty(e.mask); });
     out.list.forEach(function (e) { out.all = WB.mask.union(out.all, e.mask); });
     return out;
-  };
+  }
 
 })(window.CS);

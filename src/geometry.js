@@ -1616,11 +1616,16 @@ window.CS = window.CS || {};
         : (dirn > 0 ? [top - d, top] : [top, top + d]);
 
       var solids = F.list.map(function (e) {
-        var rings = [];
-        WB.contours(e.mask, g, copts).forEach(function (poly) {
-          rings.push(poly.outer.map(function (p) { return [p.x, p.y]; }));
-          poly.holes.forEach(function (h) { rings.push(h.map(function (p) { return [p.x, p.y]; })); });
-        });
+        // Traced once per mask: a cached face hands back the same entries.
+        var rings = e._rings;
+        if (!rings) {
+          rings = [];
+          WB.contours(e.mask, g, copts).forEach(function (poly) {
+            rings.push(poly.outer.map(function (p) { return [p.x, p.y]; }));
+            poly.holes.forEach(function (h) { rings.push(h.map(function (p) { return [p.x, p.y]; })); });
+          });
+          e._rings = rings;
+        }
         if (!rings.length) return null;
         return { e: e, rings: rings, m: prism(S, rings, span[0], span[1]) };
       }).filter(function (x) { return x && x.m; });
@@ -1694,7 +1699,8 @@ window.CS = window.CS || {};
           '-layer ' + i.rel.style + ' with a floor behind it. Make it at least ' + (min * 2).toFixed(1) + ' mm.' });
       }
       if (i.F.list.length) {
-        var thin = WB.maxInscribed(i.F.all, i.grid) * 2;
+        if (i.F._thin == null) i.F._thin = WB.maxInscribed(i.F.all, i.grid) * 2;   // kept with the cached face
+        var thin = i.F._thin;
         if (thin > 0 && thin < 0.8) {
           warn.push({ level: 'warn', msg: 'Thinnest detail on ' + tag + ' is about ' + thin.toFixed(2) +
             ' mm wide — under two 0.4 mm lines. Try a bolder font or a thicker border.' });

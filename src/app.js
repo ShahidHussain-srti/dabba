@@ -1640,7 +1640,7 @@
     WB.loadManifold().then(function (w) {
       CS.setManifold(w);
       busy(false);
-      rebuild();
+      rebuild.now();                        // nothing to wait for: show the first model at once
     }, function (err) {
       busy(false);
       showWarnings([{ level: 'bad', msg: err.message }]);

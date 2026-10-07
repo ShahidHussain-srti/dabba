@@ -220,7 +220,15 @@ window.CS = window.CS || {};
     if (face.border.style === 'none') return;
     var key = JSON.stringify([fo.w, fo.h, fo.r, fo.fullW, fo.fullH, face.border]);
 
-    if (!this._ringCache || this._ringCache.key !== key) {
+    // While a value is being dragged the ring would be rebuilt on every frame;
+    // instead the last one is stretched to fit, and rebuilt at most every
+    // 150 ms and once more when things settle.
+    var now = performance.now(), self = this;
+    if (this._ringCache && this._ringCache.key !== key && now - (this._ringAt || 0) < 150) {
+      clearTimeout(this._ringTimer);
+      this._ringTimer = setTimeout(function () { self._ringAt = 0; self.draw(); }, 160);
+    } else if (!this._ringCache || this._ringCache.key !== key) {
+      this._ringAt = now;
       // Roughly matches the on-screen scale, so the ring isn't upscaled and soft.
       var ppmm = WB.clamp(900 / Math.max(fo.fullW, fo.fullH), 6, 16);
       var g = WB.makeGrid(fo.fullW, fo.fullH, ppmm);
@@ -239,11 +247,11 @@ window.CS = window.CS || {};
         }
         ictx.putImageData(img, 0, 0);
       }
-      this._ringCache = { key: key, canvas: cv, g: g };
+      this._ringCache = { key: key, canvas: cv, g: g, w: fo.fullW, h: fo.fullH };
     }
 
     var c = this._ringCache;
-    var w = c.g.cols / c.g.ppmm * t.s, h = c.g.rows / c.g.ppmm * t.s;
+    var w = c.g.cols / c.g.ppmm * t.s * (fo.fullW / c.w), h = c.g.rows / c.g.ppmm * t.s * (fo.fullH / c.h);
     ctx.save();
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(c.canvas, t.ox - w / 2, t.oy - h / 2, w, h);
