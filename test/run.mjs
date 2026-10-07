@@ -244,8 +244,20 @@ console.log('items');
   const st = CS.itemShape(CS.newSection({ item: 'stepped', params: { stepped: { segs: [{ d: 40, len: 100 }, { d: 20, len: 30 }] } } }), 0.4);
   check('stepped cylinder sections share one axis', st.prims.every(q => Math.abs(q.axis - (40 + 0.8) / 2) < 1e-9) && Math.abs(st.w - 130.8) < 1e-9,
         st.prims.map(q => q.axis).join(',') + ' w ' + st.w);
-  const bt = CS.itemShape(CS.newSection({ item: 'batteries', params: { batteries: { type: 'AA', rows: 2, cols: 3, hold: 50 } } }), 0.4);
-  check('standing batteries hold half their length', bt.prims.length === 6 && bt.prims.every(q => Math.abs(q.depth - 25.25) < 1e-9) && bt.h === 50.5);
+  const bt = CS.itemShape(CS.newSection({ item: 'batteries', params: { batteries: { type: 'AA', rows: 2, cols: 3 } } }), 0.4);
+  {
+    const opts = CS.itemByKey('batteries').params[0].options.map(o => o[0]);
+    check('the battery menu lists every battery once, AA first', opts.length === Object.keys(CS.BATTERIES).length &&
+          new Set(opts).size === opts.length && opts.every(k => CS.BATTERIES[k]) && opts[0] === 'AA' &&
+          CS.itemParams(CS.newSection({ item: 'batteries' })).type === 'AA', opts.length + ' / ' + Object.keys(CS.BATTERIES).length);
+  }
+  check('standing batteries take the compartment\'s depth', bt.prims.length === 6 && bt.prims.every(q => q.depth == null) && bt.h === 50.5);
+  {
+    const bs = CS.defaults(), b0 = CS.layout.sections(bs.layout)[0];
+    b0.item = 'batteries'; b0.params = { batteries: { type: 'AA', rows: 1, cols: 2 } }; b0.depth = 5;
+    const Db = CS.describe(bs), sb = Db.rects.find(r => r.id === b0.id).node;
+    check('a battery hole is as deep as the base allows, whatever depth was set', Math.abs(sb._depth - Db.Hb) < 1e-6, sb._depth + ' vs ' + Db.Hb);
+  }
 }
 
 console.log('layout');
@@ -260,6 +272,14 @@ console.log('layout');
     minGap = Math.min(minGap, Math.max(gx, gy));
   }
   check('thinnest inner wall equals the setting', Math.abs(minGap - s.walls.inner) < 1e-6, minGap.toFixed(3));
+  {
+    const own = JSON.parse(JSON.stringify(s)), os = CS.layout.sections(own.layout);
+    os[0].fit = 0.3; os[1].fit = -1;
+    const Do = CS.describe(own), ro = id => Do.rects.find(q => q.id === id);
+    check('a compartment\'s own clearance adds to the global one, never below zero',
+          Math.abs(ro(os[0].id).w - (os[0].w + 2 * (own.fit + 0.3))) < 1e-6 && Math.abs(ro(os[1].id).w - os[1].w) < 1e-6,
+          ro(os[0].id).w + ' / ' + ro(os[1].id).w);
+  }
   check('every cavity is object + fit', secs.every(r => Math.abs(r.w - (r.node.w + 2 * s.fit)) < 1e-6 &&
                                                        Math.abs(r.l - (r.node.l + 2 * s.fit)) < 1e-6));
   const id = s.selected;

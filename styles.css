@@ -19,6 +19,9 @@
 .inlinerow{display:flex; align-items:center; gap:8px}
 .inlinerow .grow{flex:1}
 .seg.full{display:flex; width:100%}
+/* Five choices (…, Fill, Custom) stay on one line in the sidebar. */
+.seg.small.full:has(> button:nth-child(5)):not(:has(> button:nth-child(6))){grid-template-columns:repeat(5, minmax(0, 1fr))}
+.seg.small.full:has(> button:nth-child(5)):not(:has(> button:nth-child(6))) button{padding:3px 2px}
 button.danger:hover{border-color:var(--bad); color:var(--bad)}
 .trio{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
 .trio label{display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--ink3)}

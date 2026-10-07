@@ -75,14 +75,12 @@ window.CS = window.CS || {};
   /* Switch one axis of a compartment to a custom position without it
      moving: from then on dx / dy is measured from the middle of its slot.
      `r` is its rect as last laid out. Returns how far the offset's zero moved,
-     for a drag in progress. A filled axis keeps the size it had. */
+     for a drag in progress. A filled axis goes back to the object's own size,
+     centred where the filled pocket was. */
   L.toCustom = function (s, r, axis) {
     var k = axis === 'x' ? 'alignX' : 'alignY', d = axis === 'x' ? 'dx' : 'dy';
     if (s[k] === 'custom' || !r) return 0;
-    if (s[k] === 'stretch' && s._size && s._shape && s._shape.fill) {
-      if (axis === 'x') s.w = Math.round(s._size.w * 10) / 10; else s.l = Math.round(s._size.l * 10) / 10;
-      if (s._fill) s._fill[axis] = false;
-    }
+    if (s[k] === 'stretch' && s._fill) s._fill[axis] = false;
     var mid = axis === 'x' ? (r.slot.x0 + r.slot.x1) / 2 : (r.slot.y0 + r.slot.y1) / 2;
     var off = CS.tidy((axis === 'x' ? r.cx : r.cy) - mid), shift = off - (r[d] || 0);
     s[k] = 'custom';
@@ -137,10 +135,12 @@ window.CS = window.CS || {};
 
     var fit = Math.max(0, state.fit);
     var hmax = 0;
-    // What each compartment holds, as pocket shapes (items.js).
+    // What each compartment holds, as pocket shapes (items.js). Each one's
+    // clearance is the global one plus its own, never below zero.
     secs.forEach(function (s) {
       if (!s.item) s.item = s.shape === 'round' ? 'round' : 'box';
-      s._shape = CS.itemShape(s, fit);
+      s._fit = Math.max(0, fit + (isFinite(s.fit) ? +s.fit : 0));
+      s._shape = CS.itemShape(s, s._fit);
       if (s._shape.h > hmax) hmax = s._shape.h;
     });
 
@@ -170,11 +170,13 @@ window.CS = window.CS || {};
     secs.forEach(function (s) {
       var d;
       var sh = s._shape;
-      if (s.depth != null && isFinite(s.depth)) d = WB.clamp(snap(s.depth), lh, Hb);
+      // Batteries are a standard size: their holes always go as deep as the
+      // base allows, which the base share sets.
+      if (s.depth != null && isFinite(s.depth) && s.item !== 'batteries') d = WB.clamp(snap(s.depth), lh, Hb);
       else if (state.seat === 'flush') d = Math.min(snap(sh.h), Hb);
       else d = Hb;
       s._depth = CS.tidy(d);
-      // Shapes with their own hold depth (bits, standing batteries) may go no
+      // Shapes with their own hold depth (bits, card slots) may go no
       // deeper than the base allows.
       sh.prims.forEach(function (q) {
         q._depth = q.depth != null && isFinite(q.depth) ? WB.clamp(snap(q.depth), lh, Hb) : s._depth;
@@ -242,7 +244,7 @@ window.CS = window.CS || {};
       // whatever its slot gives it.
       // Only boxes and ovals grow with Fill; other shapes keep their own size.
       var grows = r.node._shape && r.node._shape.fill;
-      r.node._size = grows ? { w: CS.tidy(r.w - 2 * fit), l: CS.tidy(r.l - 2 * fit) } : { w: r.node.w, l: r.node.l };
+      r.node._size = grows ? { w: CS.tidy(r.w - 2 * r.node._fit), l: CS.tidy(r.l - 2 * r.node._fit) } : { w: r.node.w, l: r.node.l };
       r.node._fill = { x: r.node.alignX === 'stretch', y: r.node.alignY === 'stretch' };
       var m = r.node._margin || 0;
       var xr = [-IW / 2 + m - r.x0, IW / 2 - m - r.x1], yr = [-IL / 2 + m - r.y0, IL / 2 - m - r.y1];

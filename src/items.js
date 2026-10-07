@@ -16,17 +16,56 @@ window.CS = window.CS || {};
 (function (CS) {
   'use strict';
 
+  /* Standard sizes, mm: the largest a cell of the type is made to (IEC
+     maximums where they exist), so any brand fits. A box is width × thickness
+     × height. The menu follows BATTERY_ORDER (an object puts number-like
+     keys such as '18650' first, whatever order they are written in). */
   var BATTERIES = {
     AA:     { d: 14.5, len: 50.5, label: 'AA' },
     AAA:    { d: 10.5, len: 44.5, label: 'AAA' },
+    AAAA:   { d: 8.3,  len: 42.5, label: 'AAAA' },
     C:      { d: 26.2, len: 50,   label: 'C' },
     D:      { d: 34.2, len: 61.5, label: 'D' },
-    '18650':{ d: 18.6, len: 65.2, label: '18650' },
-    '21700':{ d: 21.4, len: 70.2, label: '21700' },
-    CR123A: { d: 17,   len: 34.5, label: 'CR123A' },
+    N:      { d: 12,   len: 30.2, label: 'N' },
+    A23:    { d: 10.3, len: 28.5, label: 'A23 (12 V)' },
+    '4LR44':{ d: 13,   len: 25.2, label: '4LR44 (6 V)' },
     '9V':   { box: [26.5, 17.5, 48.5], label: '9 V' },
+    '3LR12':{ box: [62, 22, 67], label: '4.5 V flat (3LR12)' },
+    SubC:   { d: 22.2, len: 42.9, label: 'Sub-C' },
+    '10440':{ d: 10.2, len: 44.5, label: '10440 Li-ion' },
+    '14500':{ d: 14.5, len: 53.5, label: '14500 Li-ion' },
+    '16340':{ d: 16.4, len: 34.5, label: '16340 / RCR123A' },
+    '18350':{ d: 18.4, len: 36,   label: '18350 Li-ion' },
+    '18500':{ d: 18.4, len: 50.5, label: '18500 Li-ion' },
+    '18650':{ d: 18.6, len: 65.2, label: '18650' },
+    '20700':{ d: 20.4, len: 70.5, label: '20700 Li-ion' },
+    '21700':{ d: 21.4, len: 70.2, label: '21700' },
+    '26650':{ d: 26.5, len: 65.8, label: '26650 Li-ion' },
+    '32650':{ d: 32.4, len: 67.7, label: '32650 Li-ion' },
+    '4680': { d: 46,   len: 80,   label: '4680 Li-ion' },
+    CR123A: { d: 17,   len: 34.5, label: 'CR123A' },
+    CR2:    { d: 15.6, len: 27,   label: 'CR2' },
+    CR1220: { d: 12.5, len: 2,    coin: true, label: 'CR1220 coin' },
+    CR1616: { d: 16,   len: 1.6,  coin: true, label: 'CR1616 coin' },
+    CR1632: { d: 16,   len: 3.2,  coin: true, label: 'CR1632 coin' },
+    CR2016: { d: 20,   len: 1.6,  coin: true, label: 'CR2016 coin' },
+    CR2025: { d: 20,   len: 2.5,  coin: true, label: 'CR2025 coin' },
     CR2032: { d: 20,   len: 3.2,  coin: true, label: 'CR2032 coin' },
-    CR2025: { d: 20,   len: 2.5,  coin: true, label: 'CR2025 coin' }
+    CR2430: { d: 24.5, len: 3,    coin: true, label: 'CR2430 coin' },
+    CR2450: { d: 24.5, len: 5,    coin: true, label: 'CR2450 coin' },
+    CR2477: { d: 24.5, len: 7.7,  coin: true, label: 'CR2477 coin' },
+    LR44:   { d: 11.6, len: 5.4,  coin: true, label: 'LR44 / AG13 button' },
+    LR1130: { d: 11.6, len: 3.1,  coin: true, label: 'LR1130 / AG10 button' },
+    LR41:   { d: 7.9,  len: 3.6,  coin: true, label: 'LR41 / AG3 button' },
+    SR626:  { d: 6.8,  len: 2.6,  coin: true, label: 'SR626 / 377 button' }
+  };
+  var BATTERY_ORDER = ['AA', 'AAA', 'AAAA', 'C', 'D', 'N', 'A23', '4LR44', '9V', '3LR12', 'SubC',
+    '10440', '14500', '16340', '18350', '18500', '18650', '20700', '21700', '26650', '32650', '4680',
+    'CR123A', 'CR2', 'CR1220', 'CR1616', 'CR1632', 'CR2016', 'CR2025', 'CR2032', 'CR2430', 'CR2450', 'CR2477',
+    'LR44', 'LR1130', 'LR41', 'SR626'];
+  var batteryOption = function (k) {
+    var b = BATTERIES[k], f = function (v) { return String(v); };
+    return [k, b.label + ' — ' + (b.box ? b.box.map(f).join(' × ') : '⌀' + f(b.d) + ' × ' + f(b.len)) + ' mm'];
   };
   var CARDS = {
     SD:      { w: 24, t: 2.1, h: 32, label: 'SD card' },
@@ -51,11 +90,12 @@ window.CS = window.CS || {};
       hint: 'Battery air pump, screwdriver, drill, a bottle with a cap: round sections of different sizes on one axis, end to end.',
       segments: true },
     { key: 'batteries', name: 'Battery holder', group: 'Batteries & small parts',
-      hint: 'A grid of batteries, standing or lying.',
-      params: [{ key: 'type', label: 'Battery', options: Object.keys(BATTERIES).map(function (k) { return [k, BATTERIES[k].label]; }) },
+      hint: 'A grid of batteries, standing or lying. Batteries are a standard size, so each hole is ' +
+            'as deep as the base allows: the base share of the height sets it, and the lid takes the rest.',
+      params: [{ key: 'type', label: 'Battery', options: BATTERY_ORDER.map(batteryOption), def: 'AA' },
                ['rows', 'Rows', 2, 1, 20, 1], ['cols', 'Columns', 4, 1, 30, 1],
                { key: 'lying', label: 'Orientation', options: [['no', 'Standing'], ['yes', 'Lying']] },
-               ['hold', 'Hold depth, standing', 50, 20, 100, 5, '%'], ['gap', 'Wall between', 1.6, 0.6, 10, 0.1]] },
+               ['gap', 'Wall between', 1.6, 0.6, 10, 0.1]] },
     { key: 'bits', name: 'Hex bit holder', group: 'Batteries & small parts',
       hint: 'Standard ¼″ hex screwdriver bits (6.35 mm across flats), standing.',
       params: [['rows', 'Rows', 2, 1, 20, 1], ['cols', 'Columns', 8, 1, 40, 1],
@@ -85,7 +125,7 @@ window.CS = window.CS || {};
   CS.itemParams = function (s) {
     var it = CS.itemByKey(s.item), p = Object.assign({}, (s.params && s.params[it.key]) || {});
     (it.params || []).forEach(function (d) {
-      var key = Array.isArray(d) ? d[0] : d.key, def = Array.isArray(d) ? d[2] : d.options[0][0];
+      var key = Array.isArray(d) ? d[0] : d.key, def = Array.isArray(d) ? d[2] : d.def != null ? d.def : d.options[0][0];
       if (p[key] == null) p[key] = def;
     });
     if (it.segments && !Array.isArray(p.segs)) p.segs = [{ d: 45, len: 110 }, { d: 24, len: 30 }, { d: 9, len: 28 }];
@@ -134,7 +174,7 @@ window.CS = window.CS || {};
       if (b.box) {
         var bw = b.box[0] + f2, bt = b.box[1] + f2, bl = b.box[2];
         if (lying) prims = grid(p.rows, p.cols, bl + f2 + gap, bw + gap, function (x, y) { return { type: 'rect', x: x, y: y, w: bl + f2, l: bw, rot: 0 }; });
-        else prims = grid(p.rows, p.cols, bw + gap, bt + gap, function (x, y) { return { type: 'rect', x: x, y: y, w: bw, l: bt, rot: 0, depth: bl * p.hold / 100 }; });
+        else prims = grid(p.rows, p.cols, bw + gap, bt + gap, function (x, y) { return { type: 'rect', x: x, y: y, w: bw, l: bt, rot: 0 }; });
         h = lying ? b.box[1] : bl;
       } else if (b.coin) {
         var cd = b.d + f2;
@@ -145,7 +185,7 @@ window.CS = window.CS || {};
         h = b.d;
       } else {
         var dd = b.d + f2;
-        prims = grid(p.rows, p.cols, dd + gap, dd + gap, function (x, y) { return { type: 'round', x: x, y: y, w: dd, l: dd, rot: 0, depth: b.len * p.hold / 100 }; });
+        prims = grid(p.rows, p.cols, dd + gap, dd + gap, function (x, y) { return { type: 'round', x: x, y: y, w: dd, l: dd, rot: 0 }; });
         h = b.len;
       }
     } else if (it.key === 'bits') {

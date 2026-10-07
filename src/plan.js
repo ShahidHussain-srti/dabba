@@ -972,7 +972,10 @@ window.CS = window.CS || {};
       return 'default';
     }
 
+    // Only the main button drags; the others do nothing, menu included.
+    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     canvas.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
       var p = local(e);
       canvas.focus();
       var h = self.hit(p.x, p.y);

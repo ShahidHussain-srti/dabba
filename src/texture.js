@@ -51,6 +51,20 @@ window.CS = window.CS || {};
     }
     return [f1, f2];
   }
+  /* Distance, in pattern units, to the nearest knot: sparse, on a coarse
+     jittered lattice that repeats round the wrap like the rest. */
+  function woodKnot(x, y, W) {
+    var q = wf(0.07, W), fy = 0.08, X = x * q[0], Y = y * fy, ix = Math.floor(X), iy = Math.floor(Y), best = 9;
+    for (var j = -1; j <= 1; j++) for (var i = -1; i <= 1; i++) {
+      var cx = ix + i, cy = iy + j, hx = wrapI(cx, q[1]);
+      if (hash(hx * 3 + 11, cy * 5 + 7) > 0.3) continue;             // most cells have no knot
+      var px = cx + 0.2 + 0.6 * hash(hx, cy + 91), py = cy + 0.2 + 0.6 * hash(cy + 17, hx + 29);
+      var d = Math.hypot((X - px) / q[0], (Y - py) / fy * 1.6);       // a little long along the grain
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
   /* A noise frequency along x that fits a whole number of cells into a wrap of
      W units: returns [x frequency, cells per wrap]. Without a wrap, as asked. */
   function wf(freq, W) {
@@ -145,10 +159,32 @@ window.CS = window.CS || {};
       var a = WB.clamp(Math.sin(Math.PI * x) * 3, -1, 1), b = WB.clamp(Math.sin(Math.PI * y) * 3, -1, 1);
       return 0.5 - 0.5 * a * b;
     },
+    /* A flat-sawn board. Growth rings are cylinders round the log's axis
+       (along x), cut by a plane that drifts nearer and further from it, which
+       draws the cathedral arches; the log's centre wanders, and repeats down
+       the board (mirrored, so the rings run on unbroken). Rings vary in width
+       year to year; each runs from soft early wood up to a sharp, proud ridge
+       of late wood, as on brushed or weathered timber, with fine fibres along
+       the grain and now and then a knot the rings swirl round. */
     wood: function (x, y, W) {
-      var q = wf(0.35, W), r = wf(0.12, W);
-      var t = y + 0.45 * fbm(x * q[0], y * 0.9, 2, q[1]) + 0.3 * fbm(x * r[0], y * 0.05, 1, r[1]);
-      return 0.5 + 0.5 * Math.cos(TAU * t * 2.5);
+      var a = wf(0.07, W), c = wf(0.05, W), b = wf(0.3, W), fq = wf(0.6, W), P = 9;
+      var h = 1.8 + 5 * Math.abs(fbm(x * a[0], y * 0.04 + 0.37, 2, a[1]) - 0.5);   // the cut's distance from the axis
+      var dy = P * (frac((y - 2.2 * (fbm(x * c[0], 5.1, 2, c[1]) - 0.5)) / P) - 0.5);
+      // The log tapers, so rings grow along it and the cut slips out of them
+      // in nested arches; the taper swells and eases along the board.
+      var taper = 3.6 * (fbm(x * c[0] * 1.6, 8.3, 2, c[1] * 1.6) - 0.5);
+      var r = Math.sqrt(dy * dy + h * h) + taper + 0.25 * fbm(x * b[0], y * 0.7, 2, b[1]);
+      var kn = woodKnot(x, y, W);
+      r += 2 * Math.exp(-(kn / 1.7) * (kn / 1.7));                    // rings bend round a knot
+      var t = r * 1.9 + 1.1 * vnoise(r * 0.55, 3.3, 0);                // wider and narrower years
+      var ring = function (p) { return sstep(0.45, 0.8, p) * (1 - sstep(0.9, 1, p)); };
+      var fibre = fbm(x * fq[0], y * 3.4, 2, fq[1]);
+      var hgt = 0.12 + 0.68 * ring(frac(t)) + 0.2 * fibre;
+      if (kn < 1) {                                                    // the knot: tight rings of its own
+        var core = 1 - sstep(0.7, 1, kn);
+        hgt = hgt * (1 - core) + (0.25 + 0.7 * ring(frac(kn * 2.4 + 0.3))) * core;
+      }
+      return 1 - WB.clamp(hgt, 0, 1);
     },
     crosshatch: function (x, y) {
       var a = 0.5 + 0.5 * Math.cos(TAU * (x + y) * 1.5), b = 0.5 + 0.5 * Math.cos(TAU * (x - y) * 1.5);

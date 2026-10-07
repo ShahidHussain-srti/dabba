@@ -301,6 +301,19 @@
     });
     var sn = sectionNow();
     if (sn) { paintFill(sn); paintPosition(sn); }
+    paintBedPreset();
+  }
+
+  /* The printer list shows the bed it matches, or Custom. */
+  function paintBedPreset() {
+    var sel = $('#bed-preset'), b = state.bed;
+    if (!sel || !b) return;
+    var key = b.w + 'x' + b.d;
+    sel.value = [].some.call(sel.options, function (o) { return o.value === key; }) ? key : 'custom';
+  }
+  function paintBedToggle() {
+    var print = state.build === 'tray' || ($('#pose .on') || {}).value === 'print';
+    $('#bed-wrap').style.display = print ? '' : 'none';
   }
 
   function refresh() {
@@ -361,6 +374,7 @@
       if (el.dataset.hide && match(el.dataset.hide)) show = false;
       el.style.display = show ? '' : 'none';
     });
+    paintBedToggle();
   }
   function match(rule) {
     var i = rule.indexOf(':');
@@ -427,18 +441,29 @@
     if (!s) return;
     paintItem(s);
     paintFill(s);
-    var auto = s.depth == null;
+    paintPosition(s);
+    // Battery holes are always automatic: the base share sets them.
+    var fixed = s.item === 'batteries', auto = s.depth == null || fixed;
     $('#sec-depth-auto').checked = auto;
+    $('#sec-depth-auto').disabled = fixed;
     var dEl = $('#sec-depth');
     if (document.activeElement !== dEl) dEl.value = s._depth != null ? s._depth : '';
     dEl.disabled = auto;
     $('#sec-depth-now').textContent = s._depth != null ? s._depth.toFixed(2) + ' mm' : '';
     var up = (s._shape ? s._shape.h : s.h) - (s._depth || 0);
-    $('#sec-depth-hint').textContent = (auto
+    $('#sec-depth-hint').textContent = (fixed
+      ? 'Batteries are a standard size, so the holes go as deep as the base allows (' + D.Hb.toFixed(1) +
+        ' mm): set the base share of the height to change it.'
+      : auto
       ? (state.seat === 'flush' ? 'Matched to the object, up to the full ' + D.Hb.toFixed(1) + ' mm the base allows.'
                                 : 'Reaches the floor: the full ' + D.Hb.toFixed(1) + ' mm of the base.')
       : 'Custom; the base allows up to ' + D.Hb.toFixed(1) + ' mm.') +
       (up > 0.05 ? ' The object stands ' + up.toFixed(1) + ' mm above the rim, into the lid.' : '');
+
+    var gf = Math.max(0, state.fit), own = isFinite(s.fit) ? +s.fit : 0;
+    $('#sec-fit-hint').textContent = 'Added to the global ' + gf.toFixed(2) + ' mm under Fit & height; negative for a snugger fit. ' +
+      'This pocket: ' + (s._fit != null ? s._fit : Math.max(0, gf + own)).toFixed(2) + ' mm each side' +
+      (gf + own < 0 ? ' (it can\'t go below zero).' : '.');
 
     var nAuto = s.groove.depth == null;
     $('#notch-depth-auto').checked = nAuto;
@@ -873,14 +898,29 @@
     lastModel = model;
     if (viewer && !viewer.failed) {
       var first = !viewer.count;
+      viewer.bedState = state.bed;
       viewer.setModel(model.parts, model.D, model.atlas);
       viewer.setOutline(state.selected);
       if (first) viewer.frame();
       viewer.draw();
     }
     stats(model, performance.now() - t0);
-    showWarnings(model.warnings);
+    showWarnings(model.warnings.concat(bedWarnings(model)));
   }, 180);
+
+  /* Does the print layout fit the bed? Turned a quarter, if that helps. */
+  function bedWarnings(model) {
+    var b = state.bed;
+    if (!b || !b.show) return [];
+    var f = CS.printFootprint(model), e = 1e-6;
+    var fits = (f.w <= b.w + e && f.d <= b.d + e), turned = (f.d <= b.w + e && f.w <= b.d + e);
+    if (fits) return [];
+    var size = f.w.toFixed(0) + ' × ' + f.d.toFixed(0) + ' mm';
+    return [turned
+      ? { level: 'warn', msg: 'The print layout (' + size + ') fits the ' + b.w + ' × ' + b.d + ' mm bed only turned a quarter; turn it in your slicer.' }
+      : { level: 'warn', msg: 'The print layout (' + size + ') is bigger than the ' + b.w + ' × ' + b.d + ' mm bed. ' +
+          'Print the parts one at a time (most slicers can split a 3MF by object), or make the case smaller.' }];
+  }
 
   function stats(model, ms) {
     var s = model.stats;
@@ -982,14 +1022,11 @@
       }
       sd[dk] = CS.tidy(typed);
     }
-    // Leaving Fill keeps the size it had, so nothing jumps.
+    // Leaving Fill goes back to the object's own size (Fill never changed it),
+    // so Back / Centre / Front have room to place it again.
     if (path === '~s.alignX' || path === '~s.alignY') {
       var sf = sectionNow(), ax = path === '~s.alignX' ? 'x' : 'y';
-      // Only shapes that really grow (box, oval); others never changed size.
-      if (sf && sf._fill && sf._fill[ax] && sf['align' + ax.toUpperCase()] !== 'stretch' && sf._size && sf._shape && sf._shape.fill) {
-        if (ax === 'x') sf.w = Math.round(sf._size.w * 10) / 10; else sf.l = Math.round(sf._size.l * 10) / 10;
-        sf._fill[ax] = false;
-      }
+      if (sf && sf._fill && sf['align' + ax.toUpperCase()] !== 'stretch') sf._fill[ax] = false;
     }
     if (path === '~s.item') {
       var sn = sectionNow();
@@ -1030,10 +1067,18 @@
       b.addEventListener('click', function () { setPlanMode(b.value); });
     });
 
+    $('#bed-preset').addEventListener('change', function (e) {
+      var m = /^(\d+)x(\d+)$/.exec(e.target.value);
+      if (!m) { var w = $('[data-num="bed.w"] input') || $('input[data-bind="bed.w"]'); if (w) w.focus(); return; }
+      beginEdit(0);
+      state.bed.w = +m[1]; state.bed.d = +m[2];
+      refreshValues(); apply();
+    });
     $$('#pose button').forEach(function (b) {
       b.addEventListener('click', function () {
         $$('#pose button').forEach(function (x) { x.classList.toggle('on', x === b); });
         $('#angle-wrap').style.visibility = b.value === 'open' ? '' : 'hidden';
+        paintBedToggle();
         viewer.setPose(b.value);
         viewer.draw();
       });
@@ -1228,15 +1273,60 @@
     $('#btn-reset').addEventListener('click', function () {
       if (!window.confirm('Discard this design and start from the defaults?')) return;
       beginEdit(0);
-      var d = CS.defaults();
-      Object.keys(state).forEach(function (k) { if (!(k in d)) delete state[k]; });
-      Object.keys(d).forEach(function (k) { state[k] = d[k]; });
-      CS.assets.images = {};
-      CS.assets.drawings = {};
-      CS.assets.texture = null;
+      var name = state.name;
+      toDefaults();
+      state.name = name;                    // still the same design, by the same name
       clearSession();
       afterLoad();
     });
+
+    $('#btn-designs').addEventListener('click', function (e) {
+      WB.designsMenu({ anchor: e.currentTarget, session: session, open: openDesign, create: newDesign,
+                       duplicate: duplicateDesign, wipe: wipeDesigns });
+    });
+  }
+
+  function toDefaults() {
+    var d = CS.defaults();
+    Object.keys(state).forEach(function (k) { if (!(k in d)) delete state[k]; });
+    Object.keys(d).forEach(function (k) { state[k] = d[k]; });
+    CS.assets.images = {};
+    CS.assets.drawings = {};
+    CS.assets.texture = null;
+  }
+
+  /* ── designs kept in this browser (WB.Session) ── */
+  function openDesign(id) {
+    session.open(id, function (note) {
+      afterLoad();
+      if (undoHistory) undoHistory.clear();   // undo stays with the design it was made in
+      if (note) notice('warn', note);
+    });
+  }
+  function newDesign() {
+    session.saveNow();
+    toDefaults();
+    state.name = session.uniqueName(CS.defaults().name);
+    afterLoad();
+    if (undoHistory) undoHistory.clear();
+    session.startNew();
+    setTimeout(function () { session.settled(); }, 0);
+  }
+  function duplicateDesign() {
+    session.duplicate();
+    state.name = session.uniqueName(state.name + ' copy');
+    refreshValues();
+    persist();
+    notice('ok', 'You are now working on "' + state.name + '", a copy; the original is kept as it was.');
+  }
+  function wipeDesigns() {
+    session.wipe();
+    toDefaults();
+    afterLoad();
+    if (undoHistory) undoHistory.clear();
+    session.startNew();
+    setTimeout(function () { session.settled(); }, 0);
+    notice('ok', 'Every design this app kept in this browser has been deleted.');
   }
 
   // A drag in progress belongs to the design it started on.
@@ -1397,9 +1487,36 @@
     return Object.keys(CS.assets.images).length + Object.keys(CS.assets.drawings).length +
            (CS.assets.texture ? 1 : 0);
   }
+  /* The design as small as it goes for a link: compartments, texts and
+     pictures keep only what differs from a fresh one (loading fills the rest
+     back in), and compartments get short ids. */
+  function forLink(full) {
+    var n = 0, ids = {}, fresh = JSON.parse(CS.serialize({ s: CS.newSection() })).s;
+    full.layout = (function walk(node) {
+      var id = (n++).toString(36);
+      ids[node.id] = id;
+      if (node.kind === 'split') {
+        var sp = Object.assign({}, node, { id: id });
+        sp.children = (node.children || []).map(walk);
+        return sp;
+      }
+      return Object.assign({ id: id, kind: 'section' }, WB.shareTrim(node, fresh, ['id', 'kind']));
+    })(full.layout);
+    if (ids[full.selected]) full.selected = ids[full.selected];
+    ['lid', 'base'].forEach(function (w) {
+      var f = full.faces && full.faces[w];
+      if (!f) return;
+      f.texts = (f.texts || []).map(function (t) { return WB.shareTrim(t, CS.newText(), ['id']); });
+      f.arts = (f.arts || []).map(function (a) { return WB.shareTrim(a, CS.newArt(), ['id']); });
+    });
+    return full;
+  }
+
   function shareLink() {
     var pics = pictureCount(), btn = $('#btn-share');
-    var payload = { app: 'dabba', version: 1, state: JSON.parse(CS.serialize(state)), assets: {} };
+    // Only the changes from the defaults travel, which keeps links short.
+    var full = forLink(JSON.parse(CS.serialize(state))), base = JSON.parse(CS.serialize(CS.defaults()));
+    var payload = { app: 'dabba', version: 1, diff: 1, state: WB.shareDiff(base, full) || {} };
     if (pics) payload.picturesLeftOut = pics;
     WB.shareEncode(payload).then(function (hash) {
       var url = WB.shareBase() + hash;
@@ -1429,6 +1546,11 @@
     // Only a link that won't decode counts as damaged; a problem after it has
     // loaded is not the link's fault and must not load a second time.
     WB.shareDecode(location.hash).then(function (p) {
+      if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error('not a design');
+      // A short link holds only the changes from the defaults.
+      if (p.diff) p.state = WB.sharePatch(JSON.parse(CS.serialize(CS.defaults())), p.state || {});
+      return p;
+    }).then(function (p) {
       history.replaceState(null, '', WB.shareBase());   // later refreshes use the session
       loadPayload(p, function () {
         done();
@@ -1528,6 +1650,7 @@
     bindScrubbing();
     bindHistory();
     WB.addResetButtons($$('.sidebar .panel'), resetPanel);
+    WB.addCollapseAll($('#sidebar'));
     bindSections();
     bindLists();
     chrome();
@@ -1560,6 +1683,7 @@
         'localStorage is blocked. Use Save to keep a copy.' }]);
     }
     if (!restoring) apply();
+    session.settled();
     loadEngine();
   }
 

@@ -23,14 +23,17 @@ whole 42 mm units, and you get the standard feet and optional magnet holes.
 ### Compartments
 
 Add as many as you like and pick what each one holds. Fit clearance is added around
-whatever you choose.
+whatever you choose; each compartment can add to the global clearance, or take some away
+for a snugger fit.
 
 - **Box**, **round/oval** and **capsule** pockets, sized by width, length and height.
 - **Lying cylinder** for torches, bottles or a rolled-up cable, which rest in a round trough.
 - **Stepped cylinder** for things made of round sections end to end, like the air pump
   (body, neck, nozzle) or a screwdriver. Add as many sections as you need.
-- **Battery holders** for AA, AAA, C, D, 18650, 21700, CR123A, 9 V and coin cells,
-  standing or lying down.
+- **Battery holders** for 37 standard sizes: AA, AAA, AAAA, C, D, N, A23, 9 V and 4.5 V, Li-ion
+  cells from 10440 to 4680 (18650, 21700 and the rest), CR123A and CR2, and coin and button
+  cells, standing or lying down. Batteries are a standard size, so each hole goes as deep as
+  the base allows; the base share of the height sets that, and the lid takes the rest.
 - **Hex bit holders** and **card slots** for SD, microSD, USB sticks and CF cards.
 - **Custom shapes**, if none of those fit. Build the pocket out of boxes, ovals, capsules,
   hexagons and cylinders. Drag them around in the plan (they line up with each other's edges and centres; Alt
@@ -107,7 +110,8 @@ saved file or the exported 3MF instead.
 The 3MF comes laid out ready to print: the base upright, and the lid flipped open beside
 it so its top is on the bed. Hook latches and swing hooks add a third small piece. Every part is a closed,
 watertight solid, and every height is a whole number of layers, so set the layer height to
-match your slicer.
+match your slicer. Pick your printer under Printer to see its bed under the print layout and
+be warned if the parts don't fit on it.
 
 Colours are assigned the way Bambu Studio writes its own files, so they come through in
 Bambu Studio, OrcaSlicer, Creality Print and PrusaSlicer, numbered from extruder 1 in the

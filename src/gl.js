@@ -30,12 +30,41 @@ window.CS = window.CS || {};
     this.D = D;
     WB.Viewer.prototype.setModel.call(this, parts, atlas);
     this._outline();
+    this._placeBed();
   };
 
   CS.Viewer.prototype.setPose = function (mode, angle) {
     this.mode = mode;
     if (angle != null) this.angle = angle;
     this._upload();
+    this._placeBed();
+  };
+
+  /* The print bed ({ show, w, d }) shows under the print layout only (a tray
+     is always in its print layout), centred on what is printed. */
+  CS.Viewer.prototype.useBed = function (bed) {
+    this.bedState = bed;
+    this._placeBed();
+  };
+  CS.Viewer.prototype._placeBed = function () {
+    if (this.failed) return;
+    var b = this.bedState, B = this.bounds, D = this.D;
+    var on = b && b.show && B && (this.mode === 'print' || (D && D.tray));
+    this.setBed(on ? { w: b.w, d: b.d, cx: (B.minX + B.maxX) / 2, cy: (B.minY + B.maxY) / 2, z: B.minZ } : null);
+  };
+
+  /* Width × depth of the print layout, as exported. */
+  CS.printFootprint = function (model) {
+    var D = model.D, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    model.parts.forEach(function (part) {
+      var pose = CS.poseFor(D, part, 'print'), p = part.positions;
+      for (var i = 0; i < p.length; i += 3) {
+        var q = pose ? pose(p[i], p[i + 1], p[i + 2]) : [p[i], p[i + 1]];
+        if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0];
+        if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1];
+      }
+    });
+    return x1 >= x0 ? { w: x1 - x0, d: y1 - y0 } : { w: 0, d: 0 };
   };
 
   /* Selected compartment, outlined at rim height. */
