@@ -835,8 +835,8 @@
     $('#cface').hidden = m === 'plan';
     face.hidden = m === 'plan';
     $('#hud2d').innerHTML = m === 'plan'
-      ? 'drag to move · drag an edge to resize · <b>+</b> adds a neighbour, the outer pills a whole side · Delete removes'
-      : 'click to select · drag to move · corner handles resize · arrow keys nudge';
+      ? 'drag to move (Alt: no snapping) · drag an edge to resize · <b>+</b> adds a neighbour, the outer pills a whole side · Delete removes'
+      : 'click to select · drag to move (Alt: no snapping) · corner handles resize · arrow keys nudge';
     drawViews();
   }
 
@@ -1567,6 +1567,7 @@
   CS.getState = function () { return state; };
   CS.getViewer = function () { return viewer; };
   CS.getPlan = function () { return plan; };
+  CS.getFace = function () { return face; };
   CS.getModel = function () { return lastModel; };
   CS.undo = function () { undoHistory.undo(); };
   CS.redo = function () { undoHistory.redo(); };

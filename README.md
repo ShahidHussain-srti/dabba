@@ -33,7 +33,8 @@ whatever you choose.
   standing or lying down.
 - **Hex bit holders** and **card slots** for SD, microSD, USB sticks and CF cards.
 - **Custom shapes**, if none of those fit. Build the pocket out of boxes, ovals, capsules,
-  hexagons and cylinders. Drag them around in the plan (or nudge with the arrow keys),
+  hexagons and cylinders. Drag them around in the plan (they line up with each other's edges and centres; Alt
+  places freely) or nudge with the arrow keys,
   pull any edge or corner handle to resize while the opposite side stays put (Alt resizes
   from the centre), grab the round grip to turn them (or press `[` and `]`), and give each
   one its own depth if you like.
@@ -78,12 +79,14 @@ each wall can be set separately too. Hinges and clasps always sit on a smooth su
 
 The lid top and the base underside can carry borders, text and pictures, the same way
 [Keychain Studio](https://shahidhussain-srti.github.io/keychains/) does it. Each element
-gets its own colour, set in, engraved or raised.
+gets its own colour, set in, engraved or raised. Dragged elements snap to the edges and centre
+lines of the face, the inside of its border and each other (hold Alt to place freely).
 
 ### Getting around
 
 Click a compartment in the plan to select it, drag its edges or corners to resize it, and
-drag it to move it. Moving it, or typing a position, sets that direction to Custom
+drag it to move it; while dragging, its edges and centre snap to the other compartments,
+the interior and its slot's middle, with a guide line (hold Alt to place freely). Moving it, or typing a position, sets that direction to Custom
 (each direction also has Left / Centre / Right / Fill). A moved compartment can overlap its
 neighbours (the pockets merge) but stays inside the outer wall. Use **+** to add a neighbour, the dashed pills outside the case
 to add a compartment along a whole side, and Delete to remove one. The 3D view can show the case closed, open at any angle,

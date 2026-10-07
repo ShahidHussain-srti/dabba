@@ -235,6 +235,7 @@ window.CS = window.CS || {};
 
     this._selection(ctx, t);
     this._primSelection(ctx, t);
+    this._guides(ctx, t);
     this._dims(ctx, t);
     this._badge(ctx, W);
   };
@@ -541,9 +542,30 @@ window.CS = window.CS || {};
     var step = e.shiftKey ? 0.1 : 0.5;
     var snap = function (v) { return Math.round(v / step) * step; };
     var mx = (p.x - d.x) / t.s, my = -(p.y - d.y) / t.s;      // pointer travel, mm
+    d.guides = null;
     if (d.handle === 'move') {
       src.x = snap(d.sx0 + mx);
       src.y = snap(d.sy0 + my);
+      if (!e.altKey) {
+        // Line its box up with the compartment's other shapes (Alt: off).
+        var lines = { x: [], y: [] }, box = function (q, x, y) {
+          var pts = CS.primOutline(Object.assign({}, q, { x: 0, y: 0 }), 24);
+          var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+          return { x0: x + Math.min.apply(null, xs), x1: x + Math.max.apply(null, xs),
+                   y0: y + Math.min.apply(null, ys), y1: y + Math.max.apply(null, ys) };
+        };
+        node.prims.forEach(function (o, i) {
+          if (i === d.prim) return;
+          var b = box(o, o.x, o.y);
+          lines.x.push(b.x0, (b.x0 + b.x1) / 2, b.x1);
+          lines.y.push(b.y0, (b.y0 + b.y1) / 2, b.y1);
+        });
+        var raw = box(src, d.sx0 + mx, d.sy0 + my), sn = WB.snapBox(raw, lines, 6 / t.s);
+        if (sn.x) src.x = WB.tidy(d.sx0 + mx + sn.dx);
+        if (sn.y) src.y = WB.tidy(d.sy0 + my + sn.dy);
+        var g = WB.boxGuides(box(src, src.x, src.y), lines);
+        d.guides = { x: sn.x ? g.x : [], y: sn.y ? g.y : [], prim: true };
+      }
       d.cx = d.cx0 + (src.x - d.sx0) * t.s; d.cy = d.cy0 - (src.y - d.sy0) * t.s;
     } else if (d.handle === 'resize') {
       var a = (d.rot0 || 0) * Math.PI / 180, c = Math.cos(a), s2 = Math.sin(a);
@@ -586,7 +608,9 @@ window.CS = window.CS || {};
 
   /* Move a whole compartment. It keeps its place in the layout and gains an
      offset, held inside the outer wall; neighbours stay where they are, and
-     overlapping is fine (the pockets merge). Snaps to 0.5 mm, Shift 0.1. */
+     overlapping is fine (the pockets merge). Its edges and centre snap to the
+     other compartments', the interior's and its slot's middle (Alt: off);
+     otherwise it moves in 0.5 mm steps, Shift 0.1. */
   Plan.prototype._dragMove = function (e, p) {
     var d = this.drag, t = this.frozen;
     if (!d.moved && Math.hypot(p.x - d.x, p.y - d.y) < 3) return;
@@ -606,12 +630,67 @@ window.CS = window.CS || {};
       var sy0 = CS.layout.toCustom(s, d.rect, 'y');
       d.dy0 += sy0; d.range.y = [d.range.y[0] + sy0, d.range.y[1] + sy0];
     }
-    if (s.alignX === 'custom') s.dx = WB.tidy(WB.clamp(snap(d.dx0 + mx), d.range.x[0], d.range.x[1]));
-    if (s.alignY === 'custom') s.dy = WB.tidy(WB.clamp(snap(d.dy0 + my), d.range.y[0], d.range.y[1]));
+    var cx = s.alignX === 'custom', cy = s.alignY === 'custom', R = d.rect;
+    var sn = { x: false, y: false, dx: 0, dy: 0 }, lines = null;
+    if (!e.altKey) {
+      lines = this.snapLines(d.id);
+      lines.x.push({ v: (R.slot.x0 + R.slot.x1) / 2, centre: true });
+      lines.y.push({ v: (R.slot.y0 + R.slot.y1) / 2, centre: true });
+      var ox = cx ? mx : 0, oy = cy ? my : 0;
+      sn = WB.snapBox({ x0: R.x0 + ox, x1: R.x1 + ox, y0: R.y0 + oy, y1: R.y1 + oy }, lines, 6 / t.s);
+    }
+    if (cx) s.dx = WB.tidy(WB.clamp(sn.x ? d.dx0 + mx + sn.dx : snap(d.dx0 + mx), d.range.x[0], d.range.x[1]));
+    if (cy) s.dy = WB.tidy(WB.clamp(sn.y ? d.dy0 + my + sn.dy : snap(d.dy0 + my), d.range.y[0], d.range.y[1]));
     this.describe();
+    var now = this.D.rects.filter(function (q) { return q.id === d.id; })[0];
+    d.guides = null;
+    if (lines && now) {
+      var g = WB.boxGuides(now, lines);
+      d.guides = { x: cx && sn.x ? g.x : [], y: cy && sn.y ? g.y : [] };
+    }
     this.canvas.style.cursor = 'grabbing';
     this.draw();
     this.hooks.change(true);
+  };
+
+  /* What a dragged compartment can line up with: the interior's edges and
+     middle, and the edges and centres of the other compartments. */
+  Plan.prototype.snapLines = function (id) {
+    var D = this.D, lines = { x: [-D.IW / 2, 0, D.IW / 2], y: [-D.IL / 2, 0, D.IL / 2] };
+    D.rects.forEach(function (r) {
+      if (r.id === id) return;
+      lines.x.push(r.x0, r.cx, r.x1);
+      lines.y.push(r.y0, r.cy, r.y1);
+    });
+    return lines;
+  };
+
+  /* Alignment guides while a compartment or a shape is dragged onto a line. */
+  Plan.prototype._guides = function (ctx, t) {
+    var d = this.drag, g = d && d.guides, D = this.D;
+    if (!g || (!g.x.length && !g.y.length)) return;
+    var ox = 0, oy = 0;
+    if (g.prim) {                            // shape positions are in the compartment's own frame
+      var r = this.customRect(), q = r && r.node._shape.prims[d.prim], src = r && r.node.prims[d.prim];
+      if (!q || !src) return;
+      ox = r.cx + q.x - src.x; oy = r.cy + q.y - src.y;
+    }
+    var m = 6;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,92,170,0.9)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    g.x.forEach(function (v) {
+      var X = Math.round(sx(t, ox + v)) + 0.5;
+      ctx.moveTo(X, sy(t, D.L / 2) - m); ctx.lineTo(X, sy(t, -D.L / 2) + m);
+    });
+    g.y.forEach(function (v) {
+      var Y = Math.round(sy(t, oy + v)) + 0.5;
+      ctx.moveTo(sx(t, -D.W / 2) - m, Y); ctx.lineTo(sx(t, D.W / 2) + m, Y);
+    });
+    ctx.stroke();
+    ctx.restore();
   };
 
   Plan.prototype._edgeGlow = function (ctx, t, r, edge) {

@@ -156,6 +156,7 @@ window.CS = window.CS || {};
     ctx.drawImage(out.c, 0, 0, W, H);
 
     this._handles(ctx, t);
+    this._guides(ctx, t, W, H);
     this._dims(ctx, t, fo);
     this._badge(ctx, W);
   };
@@ -272,6 +273,51 @@ window.CS = window.CS || {};
                  w: L.width + 6, h: L.height + 4, rot: -tx.rotation * Math.PI / 180 });
     });
     return out;
+  };
+
+  /* A hit box's footprint, axis-aligned, in mm (y up). Text boxes lose their
+     pick padding, so edges line up with the ink. */
+  FaceView.prototype.footprint = function (b, t) {
+    var isText = b.key.indexOf('text') === 0;
+    var w = isText ? b.w - 6 : b.w, h = isText ? b.h - 4 : b.h;
+    var off = alignOffset(this.el(b.key), b.key, b);
+    var c = Math.cos(b.rot), sn = Math.sin(b.rot);
+    var ex = (Math.abs(c) * w + Math.abs(sn) * h) / 2, ey = (Math.abs(sn) * w + Math.abs(c) * h) / 2;
+    var cx = (b.cx + off * c - t.ox) / t.s, cy = (t.oy - b.cy - off * sn) / t.s;
+    return { x0: cx - ex / t.s, x1: cx + ex / t.s, y0: cy - ey / t.s, y1: cy + ey / t.s };
+  };
+
+  /* What a dragged element can line up with: the flat top's edges and centre
+     lines, the inside of its border, and the edges and centres of everything else on this face. */
+  FaceView.prototype.snapLines = function (t, key) {
+    var fo = this._fo || this.outline(), self = this;
+    var lines = { x: [-fo.w / 2, 0, fo.w / 2], y: [-fo.h / 2, 0, fo.h / 2] };
+    var face = this.face(), br = face.enabled ? WB.borderReach(face.border) : 0;
+    if (br > 0 && br < Math.min(fo.w, fo.h) / 2) {          // the inside of the border
+      lines.x.push(-fo.w / 2 + br, fo.w / 2 - br);
+      lines.y.push(-fo.h / 2 + br, fo.h / 2 - br);
+    }
+    this.boxes(t).forEach(function (b) {
+      if (b.key === key) return;
+      var f = self.footprint(b, t);
+      lines.x.push(f.x0, (f.x0 + f.x1) / 2, f.x1);
+      lines.y.push(f.y0, (f.y0 + f.y1) / 2, f.y1);
+    });
+    return lines;
+  };
+
+  FaceView.prototype._guides = function (ctx, t, W, H) {
+    var g = this.drag && this.drag.guides;
+    if (!g || (!g.x.length && !g.y.length)) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,92,170,0.9)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    g.x.forEach(function (v) { var X = Math.round(t.ox + v * t.s) + 0.5; ctx.moveTo(X, 0); ctx.lineTo(X, H); });
+    g.y.forEach(function (v) { var Y = Math.round(t.oy - v * t.s) + 0.5; ctx.moveTo(0, Y); ctx.lineTo(W, Y); });
+    ctx.stroke();
+    ctx.restore();
   };
 
   function alignOffset(el, key, b) {
@@ -469,12 +515,23 @@ window.CS = window.CS || {};
       var el = self.el(self.drag.key);
       var nx = (p.x - t.ox) / t.s + self.drag.dx;
       var ny = -(p.y - t.oy) / t.s + self.drag.dy;
-      if (!e.altKey) {                        // snap to the centre lines
-        if (Math.abs(nx) < 0.6) nx = 0;
-        if (Math.abs(ny) < 0.6) ny = 0;
+      var cur = self.boxes(t).filter(function (q) { return q.key === self.drag.key; })[0];
+      self.drag.guides = null;
+      if (!e.altKey && cur) {
+        // Line its edges or centre up with the top and the other elements
+        // (Alt: place freely).
+        var lines = self.snapLines(t, self.drag.key), f = self.footprint(cur, t);
+        var mx = nx - el.x, my = ny - el.y;
+        var sn = WB.snapBox({ x0: f.x0 + mx, x1: f.x1 + mx, y0: f.y0 + my, y1: f.y1 + my }, lines, 6 / t.s);
+        nx = sn.x ? WB.tidy(nx + sn.dx) : Math.round(nx * 20) / 20;
+        ny = sn.y ? WB.tidy(ny + sn.dy) : Math.round(ny * 20) / 20;
+        self.drag.guides = WB.boxGuides({ x0: f.x0 + nx - el.x, x1: f.x1 + nx - el.x, y0: f.y0 + ny - el.y, y1: f.y1 + ny - el.y }, lines);
+      } else {
+        nx = Math.round(nx * 20) / 20;
+        ny = Math.round(ny * 20) / 20;
       }
-      el.x = Math.round(nx * 20) / 20;
-      el.y = Math.round(ny * 20) / 20;
+      el.x = nx;
+      el.y = ny;
       canvas.style.cursor = 'grabbing';
       self.draw();
       self.onChange(true);
