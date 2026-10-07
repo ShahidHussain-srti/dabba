@@ -194,8 +194,16 @@
         <div class="row num" data-num="interior.height" data-min="4" data-max="200" data-step="0.2" data-unit="mm" data-hide="interior.auto:true">Interior height</div>
         <div class="row num" data-num="split" data-id="f-split" data-min="15" data-max="85" data-step="1" data-unit="%" data-scale="100" data-hide="build:tray">Base share of the height</div>
         <p class="hint" id="split-readout" data-hide="build:tray"></p>
-        <div class="row num" data-num="layerHeight" data-min="0.08" data-max="0.4" data-step="0.02" data-unit="mm">Layer height</div>
         <p class="hint" id="box-readout"></p>
+      </div>
+    </section>
+
+    <section class="panel" id="p-printer">
+      <h2>Printer</h2>
+      <div class="body">
+        <div class="row num" data-num="layerHeight" data-min="0.08" data-max="0.4" data-step="0.02" data-unit="mm">Layer height</div>
+        <p class="hint">Use the same layer height in your slicer. Floors, the parting line, the rim and the press latch's
+          web all land on whole layers of it, so nothing asks for a partial layer.</p>
       </div>
     </section>
 
@@ -408,6 +416,7 @@
           </div>
           <div data-show="clasp.type:press">
             <div class="row num" data-num="clasp.leverT" data-min="1.2" data-max="6" data-step="0.1" data-unit="mm">Lever thickness</div>
+            <div class="row num" data-num="clasp.webT" data-min="0.6" data-max="3" data-step="0.1" data-unit="mm">Web thickness</div>
           </div>
           <div data-show="clasp.type:snap|press">
             <div class="row num" data-num="clasp.reach" data-min="2" data-max="30" data-step="0.5" data-unit="mm">Reach below the rim</div>

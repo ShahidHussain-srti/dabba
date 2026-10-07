@@ -319,7 +319,10 @@ window.CS = window.CS || {};
     pr.zb = D.zP - pr.reach;
     pr.gapAt = pr.reach * D.tanO;
     pr.zTop = D.zT;                                         // flush with the lid top, so it starts on the bed
-    pr.tw = Math.max(2 * D.lh, D.lh * Math.round(0.8 / D.lh));
+    // Web thickness, in whole layers. Thicker survives knocks and falls; the
+    // stand-off below grows with it so the bend stays as gentle.
+    pr.tw = Math.max(2 * D.lh, D.lh * Math.round(WB.clamp(C.webT != null ? C.webT : 1.2, 0.6, 3) / D.lh));
+    pr.f = Math.min(0.8, pr.tw / 2);                        // 45° fillets where the web meets the tab and the wall
     pr.nf = Math.max(0.8, pr.e);
     pr.pressH = WB.clamp((pr.zTop - pr.zb) * 0.36, 4, 12);
     pr.zW = pr.zTop - pr.pressH;                            // top of the web
@@ -332,15 +335,16 @@ window.CS = window.CS || {};
     // Rocking about the web has to carry the hook's catching edge out of the slot.
     pr.theta = (pr.e + pr.cl + pr.gapAt + 0.2) / Math.max(1, pr.zW - pr.tw / 2 - pr.zTopNub);
     // Room for the press side to rock that far, and the web's bend at 2.5% or less.
-    pr.gP = Math.max(1.8, pr.theta * pr.pressH + 0.4, (pr.tw / 2) * pr.theta / 0.025);
-    pr.zCtop = pr.zW - pr.tw - 1;                           // the step starts a millimetre under the web
+    // The fillets stiffen the web's ends, so count only part of them as bending length.
+    pr.gP = Math.max(1.8, pr.theta * pr.pressH + 0.4, (pr.tw / 2) * pr.theta / 0.025 + pr.f);
+    pr.zCtop = pr.zW - pr.tw - pr.f - 0.3;                  // the step starts just under the web's fillet
     pr.zCbot = pr.zCtop - (pr.gP - pr.cl);
-    pr.strain = (pr.tw / 2) * pr.theta / pr.gP;
+    pr.strain = (pr.tw / 2) * pr.theta / (pr.gP - pr.f);
     D.press = pr;
     if (C.type === 'press' && cn) {
-      if (pr.zW - pr.tw < D.zP + 0.6 || pr.zCbot - pr.t < pr.zTopNub + 0.3) {
+      if (pr.zW - pr.tw < D.zP + 0.6 || pr.zCbot < pr.zTopNub + 0.3) {
         warn.push({ level: 'bad', msg: 'There isn\'t room for a press latch here: the lid is too shallow for its web and step, or the reach too long. ' +
-          'Use a taller lid share, less reach, or another clasp.' });
+          'Use a taller lid share, less reach, a thinner web, or another clasp.' });
       }
       if (pr.zTopNub + pr.cl > D.zP - 0.8) {
         warn.push({ level: 'warn', msg: 'The press latch reaches only a little below the rim for its hook. More reach makes a sturdier catch.' });
@@ -1227,6 +1231,13 @@ window.CS = window.CS || {};
         addL.push(box(S, x0, yLo - t2, P2.zb, x1, yLo, P2.zCbot));
         // The web: the only joint, thin in z.
         addL.push(box(S, x0, yUp - 0.01, P2.zW - P2.tw, x1, yF + ovW, P2.zW));
+        // Fillets under the web at both ends, where a knock would snap it. They
+        // print on top of the web on the upside-down lid, so need no support.
+        var zu = P2.zW - P2.tw, fw = P2.f, yWall = yF + (zu - D.zP) * D.tanO;
+        addL.push(hullOf(S, [box(S, x0, yUp - 0.01, zu - fw, x1, yUp, zu + 0.01),
+                             box(S, x0, yUp - 0.01, zu - 0.01, x1, yUp + fw, zu + 0.01)]));
+        addL.push(hullOf(S, [box(S, x0, yWall, zu - fw, x1, yF + ovW, zu + 0.01),
+                             box(S, x0, yWall - fw, zu - 0.01, x1, yF + ovW, zu + 0.01)]));
         // Hook: 45° lead-in underneath, flat catch on top, as on the snap.
         addL.push(hullOf(S, [
           box(S, x0, yLo - 0.4, P2.zb, x1, yLo, P2.zTopNub),

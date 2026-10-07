@@ -34,8 +34,8 @@ window.CS = window.CS || {};
     var D = this.D;
     var W = Math.max(1, this.canvas.clientWidth), H = Math.max(1, this.canvas.clientHeight);
     var ext = this.extent();
-    // Room for the badge on top, the dimension lines and the + buttons around.
-    var pad = Math.min(56, W * 0.12, H * 0.12), top = 40, side = 34;
+    // Room for the badge on top, the dimension lines, the + buttons and the edge names around.
+    var pad = Math.min(68, W * 0.14, H * 0.14), top = 40, side = 34;
     var s = Math.min((W - pad * 2 - side) / Math.max(ext.w, 1), (H - pad * 2 - top - side) / Math.max(ext.h, 1));
     s = WB.clamp(s, 0.2, 30);
     var cx = (ext.x0 + ext.x1) / 2, cy = (ext.y0 + ext.y1) / 2;
@@ -732,18 +732,21 @@ window.CS = window.CS || {};
     label(D.L.toFixed(1) + ' mm', 0, 0);
     ctx.restore();
 
-    // Which edge carries the hinge, just beyond the knuckles.
-    if (D.tray) { ctx.restore(); return; }
-    var out = { back: [0, 1], front: [0, -1], left: [-1, 0], right: [1, 0] }[D.side];
-    var reach = (out[1] ? D.L / 2 : D.W / 2) + D.hinge.c + 2 * D.hinge.rk;
+    // Name each edge as the sidebar does, beyond its "whole side" pill, and
+    // mark the one that carries the hinge.
+    var mx = sx(t, (ext.x0 + ext.x1) / 2), my = sy(t, (ext.y0 + ext.y1) / 2);
+    var hingeSide = D.tray ? null : D.side;
     ctx.font = '600 9.5px -apple-system,system-ui,sans-serif';
     ctx.fillStyle = 'rgba(140,155,175,0.85)';
     ctx.textBaseline = 'middle';
-    ctx.save();
-    ctx.translate(sx(t, out[0] * reach) + out[0] * 10, sy(t, out[1] * reach) - out[1] * 10);
-    if (out[0]) ctx.rotate(-Math.PI / 2 * out[0]);
-    ctx.fillText('HINGE', 0, 0);
-    ctx.restore();
+    [['back', mx, sy(t, ext.y1) - 56, 0], ['front', mx, sy(t, ext.y0) + 70, 0],
+     ['left', sx(t, ext.x0) - 70, my, -1], ['right', sx(t, ext.x1) + 56, my, 1]].forEach(function (e) {
+      ctx.save();
+      ctx.translate(e[1], e[2]);
+      if (e[3]) ctx.rotate(Math.PI / 2 * e[3]);
+      ctx.fillText(e[0].toUpperCase() + (e[0] === hingeSide ? ' · HINGE' : ''), 0, 0);
+      ctx.restore();
+    });
     ctx.restore();
   };
 

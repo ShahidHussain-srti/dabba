@@ -90,7 +90,7 @@ window.CS = window.CS || {};
                gap: 0.4, clearance: 0.4, inset: 10 },
       clasp: { type: 'snap', count: 1, width: 14, thickness: 1.8, reach: 6, catch: 0.9,
                clearance: 0.2, grip: true, magnetD: 6, magnetH: 2, bumpR: 0.8,
-               latchD: 6, latchDrop: 0, leverT: 3 },
+               latchD: 6, latchDrop: 0, leverT: 3, webT: 1.2 },
       layout: CS.newSplit('x', [a, CS.newSplit('y', [b, c])]),
       selected: a.id,
       faces: { lid: CS.faceDefaults('lid'), base: CS.faceDefaults('base') },
