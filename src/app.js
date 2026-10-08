@@ -298,12 +298,8 @@
   }
 
   /* The printer list shows the bed it matches, or Custom. */
-  function paintBedPreset() {
-    var sel = $('#bed-preset'), b = state.bed;
-    if (!sel || !b) return;
-    var key = b.w + 'x' + b.d;
-    sel.value = [].some.call(sel.options, function (o) { return o.value === key; }) ? key : 'custom';
-  }
+  var bedPicker = null;
+  function paintBedPreset() { if (bedPicker) bedPicker.paint(state.bed); }
   function paintBedToggle() {
     var print = state.build === 'tray' || ($('#pose .on') || {}).value === 'print';
     $('#bed-wrap').style.display = print ? '' : 'none';
@@ -905,14 +901,9 @@
   function bedWarnings(model) {
     var b = state.bed;
     if (!b || !b.show) return [];
-    var f = CS.printFootprint(model), e = 1e-6;
-    var fits = (f.w <= b.w + e && f.d <= b.d + e), turned = (f.d <= b.w + e && f.w <= b.d + e);
-    if (fits) return [];
-    var size = f.w.toFixed(0) + ' × ' + f.d.toFixed(0) + ' mm';
-    return [turned
-      ? { level: 'warn', msg: 'The print layout (' + size + ') fits the ' + b.w + ' × ' + b.d + ' mm bed only turned a quarter; turn it in your slicer.' }
-      : { level: 'warn', msg: 'The print layout (' + size + ') is bigger than the ' + b.w + ' × ' + b.d + ' mm bed. ' +
-          'Print the parts one at a time (most slicers can split a 3MF by object), or make the case smaller.' }];
+    var w = WB.bedWarning(CS.printFootprint(model), b, 'The print layout',
+      'Print the parts one at a time (most slicers can split a 3MF by object), or make the case smaller.');
+    return w ? [w] : [];
   }
 
   function stats(model, ms) {
@@ -1060,13 +1051,13 @@
       b.addEventListener('click', function () { setPlanMode(b.value); });
     });
 
-    $('#bed-preset').addEventListener('change', function (e) {
-      var m = /^(\d+)x(\d+)$/.exec(e.target.value);
-      if (!m) { var w = $('[data-num="bed.w"] input') || $('input[data-bind="bed.w"]'); if (w) w.focus(); return; }
+    bedPicker = WB.bedPicker($('#bed-preset'), function (w, d) {
+      if (w == null) { var el = $('[data-num="bed.w"] input') || $('input[data-bind="bed.w"]'); if (el) el.focus(); return; }
       beginEdit(0);
-      state.bed.w = +m[1]; state.bed.d = +m[2];
+      state.bed.w = w; state.bed.d = d;
       refreshValues(); apply();
     });
+    paintBedPreset();
     $$('#pose button').forEach(function (b) {
       b.addEventListener('click', function () {
         $$('#pose button').forEach(function (x) { x.classList.toggle('on', x === b); });

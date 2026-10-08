@@ -10,11 +10,6 @@
 .brand small{font-weight:500; color:var(--ink3); font-size:12px; letter-spacing:0}
 .sidebar{width:340px}
 .panel.accent{background:linear-gradient(180deg,rgba(90,169,255,.06),transparent)}
-.panel h3{
-  margin:16px 0 9px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
-  color:var(--ink3); display:flex; align-items:center; gap:8px;
-}
-.panel h3::after{content:""; flex:1; height:1px; background:var(--line)}
 .row > .lbl i{font-style:normal; color:var(--ink3); font-size:11px}
 .inlinerow{display:flex; align-items:center; gap:8px}
 .inlinerow .grow{flex:1}
@@ -39,10 +34,6 @@ button.danger:hover{border-color:var(--bad); color:var(--bad)}
 .chip input{accent-color:var(--acc); margin:0}
 .chip:has(input:checked){border-color:var(--acc); background:rgba(90,169,255,.12); color:var(--ink)}
 .panes[data-pane=plan] #pane-3d, .panes[data-pane="3d"] #pane-2d{display:none}
-.panebar{
-  height:38px; flex:none; display:flex; align-items:center; gap:12px; padding:0 12px;
-  border-bottom:1px solid var(--line); background:var(--bg2);
-}
 .panebar .inline input[type=range]{width:110px}
 .panebar .inline b{font-family:var(--mono); font-size:11px; color:var(--ink); min-width:32px}
 #cplan,#cface{touch-action:none}

@@ -116,8 +116,9 @@ saved file or the exported 3MF instead.
 The 3MF comes laid out ready to print: the base upright, and the lid flipped open beside
 it so its top is on the bed. Hook latches and swing hooks add a third small piece. Every part is a closed,
 watertight solid, and every height is a whole number of layers, so set the layer height to
-match your slicer. Pick your printer under Printer to see its bed under the print layout and
-be warned if the parts don't fit on it.
+match your slicer. Pick your printer under Printer (Bambu Lab, Prusa, Creality Hi, K1 and K2, Elegoo,
+Anycubic, or a custom size) to see its bed under the print layout and be warned if the
+parts don't fit on it.
 
 Colours are assigned the way Bambu Studio writes its own files, so they come through in
 Bambu Studio, OrcaSlicer, Creality Print and PrusaSlicer, numbered from extruder 1 in the
