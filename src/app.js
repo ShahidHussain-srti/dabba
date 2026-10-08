@@ -1518,6 +1518,7 @@
       else clampAll([d], p, L, CS.defaults());
     });
     secs.forEach(function (s) {
+      WB.clampField(s, 'depth', 0.2, 300, null);           // its own field isn't a bound one
       // What each one holds, inside the limits its own fields have.
       Object.keys(s.params || {}).forEach(function (key) {
         var it = CS.itemByKey(key), pp = s.params[key];
