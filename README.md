@@ -96,7 +96,7 @@ to add a compartment along a whole side, and Delete to remove one. The 3D view c
 or laid out for printing. Number boxes work like Unity's inspector: type a value, or drag
 sideways on the label or the edge of the box (Shift for bigger steps, Alt for finer).
 
-**Designs** lists every design kept in this browser: start a new one, carry on in a copy, open
+**Designs** lists every design kept in this browser, each with a small picture: start a new one, carry on in a copy, open
 another or delete it. Each tab works on its own design, so two tabs never write over each
 other; a new tab picks up your latest design unless another tab has it open.
 

@@ -1278,7 +1278,7 @@
 
     $('#btn-designs').addEventListener('click', function (e) {
       WB.designsMenu({ anchor: e.currentTarget, session: session, open: openDesign, create: newDesign,
-                       duplicate: duplicateDesign, wipe: wipeDesigns });
+                       duplicate: duplicateDesign, wipe: wipeDesigns, thumbNow: designPicture });
     });
   }
 
@@ -1641,7 +1641,18 @@
   var session = new WB.Session({ key: 'dabba.session.v1', build: buildPayload, load: loadPayload,
     // A copy made because another tab had written the design meanwhile.
     rename: function (name) { state.name = name; refreshValues(); },
-    failed: function (msg) { notice('warn', msg); } });
+    failed: function (msg) { notice('warn', msg); },
+    thumb: designPicture });
+  /* The picture beside the design in Designs: the 3D view, which is just
+     the model on a clear background, or the flat view when 3D is hidden. */
+  function designPicture() {
+    if (viewer && !viewer.failed && viewer.canvas && viewer.canvas.clientWidth) {
+      viewer.draw();                         // the buffer is only readable straight after a draw
+      var url = WB.thumbnail(viewer.canvas);
+      if (url) return url;
+    }
+    return WB.thumbnail($('#cplan'));
+  }
   var storageOK = session.ok;
   function persist() { session.save(); }
 
