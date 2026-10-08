@@ -88,7 +88,7 @@ window.CS = window.CS || {};
       lip: { enabled: true, height: 2.4, clearance: 0.2,
              sides: { back: true, front: true, left: true, right: true } },
       lidInner: { mode: 'open', gap: 0.8, depth: 'mirror' },
-      hinge: { side: 'back', count: 2, knuckles: 3, length: 24, diameter: 6, pin: 1.9,
+      hinge: { side: 'back', count: 2, knuckles: 3, length: 24, diameter: 6, pin: 2.1,
                gap: 0.4, clearance: 0.4, inset: 10 },
       clasp: { type: 'snap', count: 1, width: 14, thickness: 1.8, reach: 6, catch: 0.9,
                clearance: 0.2, grip: true, magnetD: 6, magnetH: 2, bumpR: 0.8,

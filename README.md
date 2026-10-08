@@ -125,7 +125,8 @@ order they're used. Base and lid are separate objects, so you can print them in 
 filaments on any printer. Multi-colour decoration needs an AMS, CFS or MMU.
 
 For the hinge, push a length of 1.75 mm filament through the knuckles and melt or trim
-the ends. If it's tight, run a 2 mm drill through or bump up *Pin hole*. The knuckles have
+the ends. The 2.1 mm *Pin hole* leaves room for holes printed on their side coming out a
+little small; if it's still tight, run a 2.2 mm drill through or bump the hole up. The knuckles have
 45° undersides, so no supports are needed.
 
 **STL** gives you the same layout as a single-colour mesh.

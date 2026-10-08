@@ -95,6 +95,9 @@ window.CS = window.CS || {};
     var c2 = S.k(c.rotate([0, 90, 0]));                 // axis +z → +x
     return move(S, c2, x0, y, z);
   }
+  /* A pin hole's radius for a `seg`-sided polygon: the polygon's corners
+     sit outside the circle, so even its flats leave the hole full size. */
+  function holeR(r, seg) { return r / Math.cos(Math.PI / Math.max(3, seg)); }
   function cylZ(S, x, y, z0, z1, r, seg) {
     var c = S.k(api().cylinder(z1 - z0, r, r, seg, false));
     return move(S, c, x, y, z0);
@@ -234,8 +237,11 @@ window.CS = window.CS || {};
       warn.push({ level: 'warn', msg: 'The hinge knuckles are large for a case this shallow, so their supports are short. ' +
         'A smaller knuckle diameter or a taller ' + (D.zP - hg.chinBase < rk ? 'base' : 'lid') + ' prints more reliably.' });
     }
-    if (H.pin < 1.8) {
-      warn.push({ level: 'warn', msg: 'A ' + H.pin.toFixed(2) + ' mm pin hole is tight for 1.75 mm filament once printed. 1.9–2.0 mm slides in.' });
+    // Holes printed lying down come out a little small and sag at the top,
+    // so 1.75 mm filament wants about 0.3 mm more than its own size.
+    if (H.pin < 2.0) {
+      warn.push({ level: 'warn', msg: 'A ' + H.pin.toFixed(2) + ' mm pin hole is tight for 1.75 mm filament once printed: holes printed on their side come out ' +
+        'a little small. 2.1 mm (the default) slides in; go to 2.2 mm if it still binds.' });
     }
     D.hinge = hg;
 
@@ -1261,7 +1267,8 @@ window.CS = window.CS || {};
     base = union(S, [base].concat(baseBits));
     lid = union(S, [lid].concat(lidBits));
     var pins = union(S, hg.groups.map(function (g) {
-      return cylX(S, g.x0 - 1, g.x1 + 1, hg.ya, hg.za, hg.pinR, Math.max(16, Math.round(seg / 2)));
+      var ps = Math.max(16, Math.round(seg / 2));
+      return cylX(S, g.x0 - 1, g.x1 + 1, hg.ya, hg.za, holeR(hg.pinR, ps), ps);
     }));
     return { base: sub(S, base, pins), lid: sub(S, lid, pins) };
   }
@@ -1380,16 +1387,16 @@ window.CS = window.CS || {};
           addB.push(cB, hullOf(S, [cB, box(S, e[0], yF, L.chinBase, e[1], yF + ovB, D.zP - kc)]));
         });
         var x0 = ears[0][0] - 1, x1 = ears[1][1] + 1;
-        cutL.push(cylX(S, x0, x1, L.yA, L.zA, L.pinR, pseg));
-        cutB.push(cylX(S, x0, x1, L.yA, L.zB, L.pinR, pseg));
+        cutL.push(cylX(S, x0, x1, L.yA, L.zA, holeR(L.pinR, pseg), pseg));
+        cutB.push(cylX(S, x0, x1, L.yA, L.zB, holeR(L.pinR, pseg), pseg));
 
         // The hook: a bar from pivot to catch, with a slot that opens towards
         // the case, so swinging it in drops the slot over the catch pin.
         var bar = hullOf(S, [cylX(S, xa, xb, L.yA, L.zA, rk, seg), cylX(S, xa, xb, L.yA, L.zB, rk, seg)]);
         var grip = box(S, xa, L.yA - rk - 2.5, L.zB - rk, xb, L.yA - rk + 0.5, L.zB - rk + 1.6);
-        var hole = cylX(S, xa - 1, xb + 1, L.yA, L.zA, L.pinR + 0.1, pseg);
-        var slot = hullOf(S, [cylX(S, xa - 1, xb + 1, L.yA, L.zB, L.pinR + kc, pseg),
-                              cylX(S, xa - 1, xb + 1, L.yA + rk + 2, L.zB, L.pinR + kc, pseg)]);
+        var hole = cylX(S, xa - 1, xb + 1, L.yA, L.zA, holeR(L.pinR + 0.1, pseg), pseg);
+        var slot = hullOf(S, [cylX(S, xa - 1, xb + 1, L.yA, L.zB, holeR(L.pinR + kc, pseg), pseg),
+                              cylX(S, xa - 1, xb + 1, L.yA + rk + 2, L.zB, holeR(L.pinR + kc, pseg), pseg)]);
         hooks.push(sub(S, union(S, [bar, grip]), union(S, [hole, slot])));
       });
     } else if (C.type === 'swing') {
@@ -1407,7 +1414,8 @@ window.CS = window.CS || {};
         var stick = yF - g.yH1, chinTop = Math.min(g.zA + g.rb + stick, D.zT - D.et - 0.4);
         addL.push(hullOf(S, [cylY(S, xp, g.zA, g.yH1, yF + ovL, g.rb, seg),
                              box(S, xp - g.rb, yF, g.zA, xp + g.rb, yF + ovL, chinTop)]));
-        cutL.push(cylY(S, xp, g.zA, g.yH0 - 1, yF + Math.max(0.4, wallHere - 0.8), g.pinR, Math.max(16, Math.round(seg / 2))));
+        var sps = Math.max(16, Math.round(seg / 2));
+        cutL.push(cylY(S, xp, g.zA, g.yH0 - 1, yF + Math.max(0.4, wallHere - 0.8), holeR(g.pinR, sps), sps));
 
         // Eye on the base: a block with a 45° chin, slotted by the band's own
         // annulus so the tip slides through on its arc, bridged in front.
