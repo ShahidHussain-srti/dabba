@@ -172,13 +172,6 @@
   var undoHistory = null;           // set up in init(), once the buttons exist
   /* Call immediately BEFORE changing the design. */
   function beginEdit(coalesceMs) { if (undoHistory) undoHistory.begin(coalesceMs); }
-  /* Load a design as one undo step. Loading can wait on pictures, so the step
-     stays open until it is in. */
-  function loadAsStep(payload, after) {
-    if (undoHistory) undoHistory.commit();             // close any edit still pending first
-    beginEdit(600000);
-    loadPayload(payload, function () { after(); if (undoHistory) undoHistory.commit(); });
-  }
 
 
 
@@ -1262,7 +1255,9 @@
         try {
           var parsed = JSON.parse(fr.result);
           session.duplicate();                 // a new design; the one on screen stays in the list
-          loadAsStep(parsed, function () { state.name = session.uniqueName(state.name); afterLoad(); });
+          // …so its undo history starts here; the old design is in Designs.
+          if (undoHistory) undoHistory.clear();
+          loadPayload(parsed, function () { state.name = session.uniqueName(state.name); afterLoad(); });
         } catch (err) {
           showWarnings([{ level: 'bad', msg: 'That file could not be loaded: ' + err.message }]);
         }
@@ -1511,6 +1506,9 @@
       f.artIdx = WB.clamp(f.artIdx || 0, 0, Math.max(0, f.arts.length - 1));
     });
     var texts = [].concat(faces[0].texts, faces[1].texts), arts = [].concat(faces[0].arts, faces[1].arts);
+    texts.forEach(function (t) { t.content = String(t.content == null ? '' : t.content).slice(0, 2000); });
+    secs.forEach(function (s) { s.name = String(s.name == null ? '' : s.name).slice(0, 200); });
+    d.name = String(d.name || '').slice(0, 200);
     WB.fieldLimits(document, ['f-inlayDepth', 'f-reliefHeight']).forEach(function (L) {
       var p = L.path;
       if (p.indexOf('~s.') === 0) clampAll(secs, p.slice(3), L, CS.newSection());
@@ -1627,7 +1625,8 @@
       history.replaceState(null, '', WB.shareBase());
       WB.sharePopup({ kind: 'warn', title: 'That link could not be opened',
         body: ['It looks damaged or cut short. Ask for it again, or for the design file.'] });
-      if (inTab || !restoreSession(done)) done();
+      if (inTab) return;                                // the design on screen stays as it is
+      if (!restoreSession(done)) done();
     });
     return true;
   }
@@ -1727,8 +1726,7 @@
     window.addEventListener('hashchange', function () {
       if (location.hash.indexOf('#d=') !== 0) return;
       if (undoHistory) undoHistory.commit();           // close any edit still pending first
-      beginEdit(600000);
-      openSharedLink(function () { afterLoad(); if (undoHistory) undoHistory.commit(); }, true);
+      openSharedLink(function () { afterLoad(); if (undoHistory) undoHistory.clear(); }, true);   // a new design, a fresh history
     });
     var restoring = openSharedLink(afterLoad) ||
       restoreSession(function (note) {
