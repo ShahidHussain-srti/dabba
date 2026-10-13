@@ -319,6 +319,12 @@
 
   /* Slider limits that depend on the design. */
   function updateRanges() {
+    // The lid can't be shown opened past its stop.
+    var ang = $('#open-angle'), top = (D.axis && D.axis.stop) || 180;
+    if (ang && +ang.max !== top) {
+      ang.max = top;
+      if (+ang.value > top) { ang.value = top; $('#open-angle-val').textContent = top + '°'; }
+    }
     var lim = Math.ceil(Math.max(D.W, D.L) / 2) + 5;
     $$('[data-range=pos]').forEach(function (el) {
       el.min = -lim; el.max = lim;
@@ -919,11 +925,12 @@
   function paintPlates(plates) {
     var el = $('#plates-readout');
     if (!el) return;
-    var lid = plates.hooks ? 'the lid and its hooks' : 'the lid';
+    var lid = 'the lid' + (plates.hooks && plates.leaves ? ', its hinge leaves and hooks' : plates.hooks ? ' and its hooks' :
+              plates.leaves ? ' and its hinge leaves' : '');
     el.textContent = plates.split
-      ? 'Two plates: the base on plate 1, ' + lid + ' on plate 2' +
+      ? 'Two plates: the base' + (plates.leaves ? ' and its hinge leaves' : '') + ' on plate 1, ' + lid + ' on plate 2' +
         (plates.why === 'colours' ? ', as they are different colours.' : plates.why === 'size' ? ', as they only fit the bed apart.' : '.')
-      : 'One plate: the base and ' + lid + ' print together.';
+      : plates.leaves || plates.hooks ? 'One plate: all the parts print together.' : 'One plate: the base and the lid print together.';
   }
 
   function stats(model, ms) {

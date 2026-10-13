@@ -90,7 +90,10 @@ window.CS = window.CS || {};
              sides: { back: true, front: true, left: true, right: true } },
       lidInner: { mode: 'open', gap: 0.8, depth: 'mirror' },
       hinge: { side: 'back', count: 2, knuckles: 3, length: 24, diameter: 6, pin: 2.1,
-               gap: 0.4, clearance: 0.4, inset: 10 },
+               gap: 0.4, clearance: 0.4, inset: 10,
+               style: 'reinforced',   // reinforced | leaves (each knuckle printed on end, slid onto a rail)
+               stop: 110,             // the lid opens this far, then rests on the stop; 180 for none
+               fit: 0.15 },           // slide-in leaves: clearance on each side of the rail
       clasp: { type: 'snap', count: 1, width: 14, thickness: 1.8, reach: 6, catch: 0.9,
                clearance: 0.2, grip: true, magnetD: 6, magnetH: 2, bumpR: 0.8,
                latchD: 6, latchDrop: 0, leverT: 3, webT: 1.2 },

@@ -63,7 +63,15 @@ locked until you turn Fill off.
   the case wall closing the rest), or mirrors the base's compartments exactly, with the same depth,
   rounding and shapes, so things are held from above when it's shut.
 - A filament-pin hinge on any edge: count, knuckles, length, pin size and clearances are
-  all adjustable.
+  all adjustable, in two styles. Printed upright, a knuckle's ring is held across the pin
+  only by the layers at pin height, which is where printed hinges crack.
+  - **Reinforced** (default): the knuckles print with the case, each with a horn behind it
+    that makes that part of the ring thick. The horns are also a stop: the lid opens to the
+    angle you set (110° by default) and then rests on whole faces instead of levering the
+    knuckles. Set *Opens to* 180° for no stop.
+  - **Slide-in leaves**: every knuckle is a small piece of its own, printed standing on end so
+    its ring lies within the layers. Each slides onto a 45° dovetail rail on the case, and the
+    pin then holds them all on. *Rail fit* sets the clearance.
 - Clasps: snap hooks, magnets, snap bumps, a hook latch on its own pin, a swing hook like
   the ones on old jewellery boxes, or a press latch: a stiff tab hung from the lid on a thin
   web, which you press at the top to lift its hook out of the base. Its lever thickness
@@ -133,8 +141,11 @@ filaments on any printer. Multi-colour decoration needs an AMS, CFS or MMU.
 
 For the hinge, push a length of 1.75 mm filament through the knuckles and melt or trim
 the ends. The 2.1 mm *Pin hole* leaves room for holes printed on their side coming out a
-little small; if it's still tight, run a 2.2 mm drill through or bump the hole up. The knuckles have
-45° undersides, so no supports are needed.
+little small; if it's still tight, run a 2.2 mm drill through or bump the hole up. The knuckles and
+horns have 45° undersides, so no supports are needed. With slide-in leaves, the leaves stand
+in a row in front of the case: slide the base leaves down onto their rails and the lid leaves
+up onto theirs, then push the pin through. A drop of superglue on each rail takes up any
+rattle.
 
 **STL** gives you the same layout as a single-colour mesh.
 

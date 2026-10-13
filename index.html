@@ -395,6 +395,24 @@
       <h2>Hinge <small>filament pin</small></h2>
       <div class="body">
         <div class="row">
+          <span class="lbl">Style</span>
+          <div class="seg small full" role="group" aria-label="Hinge style" data-bind="hinge.style">
+            <button value="reinforced" title="Knuckles printed with the case, thickened behind and with a stop">Reinforced</button>
+            <button value="leaves" title="Each knuckle printed on end as its own piece and slid onto a rail">Slide-in leaves</button>
+          </div>
+        </div>
+        <p class="hint" data-show="hinge.style:reinforced">Printed upright, each knuckle's ring is held across the pin only by the
+          layers at pin height, which is where hinges crack. A horn behind every knuckle makes that part of the ring thick,
+          and it is also a stop: the lid rests on whole faces instead of levering the knuckles.</p>
+        <p class="hint" data-show="hinge.style:leaves">Every knuckle is a small piece of its own, printed standing on end so the
+          ring lies within its layers, the strongest way round. Each slides onto a dovetail rail on the case, and the pin
+          then holds them all on; a drop of superglue takes up any rattle.</p>
+        <div class="row num" data-num="hinge.stop" data-min="90" data-max="180" data-step="1" data-unit="°">Opens to</div>
+        <p class="hint">The lid stops here, held by the horns. 180° builds no stop.</p>
+        <div class="row num" data-num="hinge.fit" data-min="0.05" data-max="0.5" data-step="0.05" data-unit="mm" data-show="hinge.style:leaves">Rail fit</div>
+        <p class="hint" data-show="hinge.style:leaves">Clearance on each side of the rail. 0.15 mm slides on with a firm push on
+          most printers; go up if a leaf won't go on, down if it rattles.</p>
+        <div class="row">
           <span class="lbl">On the</span>
           <div class="seg small full" role="group" aria-label="Hinge edge" data-bind="hinge.side">
             <button value="back">Back</button>

@@ -213,9 +213,54 @@ window.CS = window.CS || {};
       warn.push({ level: 'warn', msg: 'Hinge length was limited to ' + Lh.toFixed(1) + ' mm to fit ' + n +
         ' hinge' + (n === 1 ? '' : 's') + ' along the ' + side + ' edge.' });
     }
-    hg.ya = Lc / 2 + rk + c; hg.za = D.zP; hg.rk = rk; hg.c = c;
+    hg.za = D.zP; hg.rk = rk; hg.c = c;
     hg.pinR = WB.clamp(H.pin / 2, 0.3, rk - 0.5);
     hg.len = Lh; hg.kl = (Lh - (k - 1) * gap) / k;
+
+    /* Two styles. Printed upright, a knuckle's ring is joined across the pin
+       only by the layers at pin height, and lifting the case by its lid pulls
+       those apart. "reinforced" keeps the knuckles on the case and gives each
+       a horn behind it, in room the lid never reaches before its stop: the
+       ring gets thick there, and the horn is the stop the lid rests on.
+       "leaves" makes every knuckle a small part of its own, printed standing
+       on end so its ring lies within the layers, slid onto a dovetail rail
+       on the case and held there by the pin. */
+    hg.style = H.style === 'leaves' ? 'leaves' : 'reinforced';
+    hg.R = rk + c;                                   // axis to the case wall
+    if (hg.style === 'leaves') {
+      // The slot is a 45° dovetail, so each flank prints as a 45° overhang.
+      var lv = { fit: WB.clamp(H.fit, 0.05, 0.5), dr: 1.5, cap: 1.2 };
+      lv.ww = Math.min(hg.kl - 2, 7);
+      lv.wn = lv.ww - 2 * lv.dr;
+      if (lv.wn < 1.2 && hg.ok) {
+        hg.ok = false;
+        warn.push({ level: 'bad', msg: 'Knuckles ' + hg.kl.toFixed(1) + ' mm long are too short for slide-in leaves: each needs about ' +
+          (3.2 + 2 * lv.dr).toFixed(1) + ' mm for its rail. Use fewer knuckles or a longer hinge.' });
+      }
+      hg.R = Math.max(rk + c, rk + lv.dr + 1);       // the slot stays clear of the ring
+      hg.leaf = lv;
+    }
+    hg.ya = Lc / 2 + hg.R;
+    // The stop: the horn's top lies where the other half's wall face is at
+    // that angle, so the swing is clear until then and meets a whole face,
+    // not the knuckle, after. The face starts R from the axis at the parting
+    // line and leans away from it by the outer taper.
+    var stop = WB.clamp(isFinite(H.stop) ? H.stop : 180, 90, 180);
+    hg.stop = stop < 179.5 ? stop : null;
+    hg.back = rk;                                    // reach behind the axis
+    hg.horn = null;
+    if (hg.stop) {
+      var R0 = hg.R, lean = stop * DEG - Math.atan(D.tanO || 0);
+      var T0p = [-R0 * Math.cos(stop * DEG), R0 * Math.sin(stop * DEG)];
+      var dy = Math.sin(lean), dzl = Math.cos(lean);           // the face's direction at the stop
+      var yH = rk + Math.max(2.4, rk), zQ = T0p[1] + (yH - T0p[0]) / dy * dzl;
+      if (zQ < 0.6 && dzl < 0) { yH = T0p[0] + (0.6 - T0p[1]) / dzl * dy; zQ = 0.6; }
+      if (yH > T0p[0] + 0.5) {
+        // Under the horn, 45° back to the knuckle, so it prints unsupported.
+        hg.horn = [T0p, [yH, zQ], [yH, Math.min(zQ, yH - rk * Math.SQRT2)]];
+        hg.back = Math.max(rk, yH);
+      }
+    }
     if (hg.ok) {
       for (var gi = 0; gi < n; gi++) {
         var cx = n === 1 ? 0 : span0 + Lh / 2 + gi * (avail - Lh) / (n - 1);
@@ -233,6 +278,16 @@ window.CS = window.CS || {};
     }
     hg.chinBase = Math.max(D.zP - 1.2 * rk * 2, D.eb + 0.4);
     hg.chinLid = Math.min(D.zP + 1.2 * rk * 2, D.zT - D.et - 0.4);
+    if (hg.leaf && hg.ok) {
+      // A leaf needs room below its slot's closed end for a rail worth having.
+      var room = Math.min(D.zP - hg.chinBase, hg.chinLid - D.zP) - hg.leaf.cap - hg.leaf.dr;
+      if (room < 2) {
+        hg.ok = false;
+        warn.push({ level: 'bad', msg: 'The case is too shallow for slide-in hinge leaves: their rails would be only ' +
+          Math.max(0, room).toFixed(1) + ' mm long. Use a taller ' + (D.zP - hg.chinBase < hg.chinLid - D.zP ? 'base' : 'lid') +
+          ', a smaller knuckle diameter, or the reinforced style.' });
+      }
+    }
     if (D.zP - hg.chinBase < rk || hg.chinLid - D.zP < rk) {
       warn.push({ level: 'warn', msg: 'The hinge knuckles are large for a case this shallow, so their supports are short. ' +
         'A smaller knuckle diameter or a taller ' + (D.zP - hg.chinBase < rk ? 'base' : 'lid') + ' prints more reliably.' });
@@ -410,12 +465,12 @@ window.CS = window.CS || {};
 
     /* Opening axis in the layout frame, for previews and the print layout. */
     var p = rotPt(0, hg.ya, -theta), d = rotPt(1, 0, -theta), nrm = rotPt(0, 1, -theta);
-    D.axis = { p: [p[0], p[1], D.zP], d: [d[0], d[1], 0], n: [nrm[0], nrm[1], 0] };
+    D.axis = { p: [p[0], p[1], D.zP], d: [d[0], d[1], 0], n: [nrm[0], nrm[1], 0], stop: hg.ok ? hg.stop : null };
 
     /* Planner-ready shapes, already back in the layout frame. */
     var back = function (x, y) { return rotPt(x, y, -theta); };
     D.planKnuckles = hg.segments.map(function (s) {
-      var a = back(s.x0, Lc / 2 + c), b = back(s.x1, Lc / 2 + c + 2 * rk);
+      var a = back(s.x0, Lc / 2 + (hg.style === 'leaves' ? 0 : c)), b = back(s.x1, hg.ya + hg.back);
       return { owner: s.owner, x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]),
                y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]) };
     });
@@ -1079,7 +1134,7 @@ window.CS = window.CS || {};
        there is none, they run into the case wall and join it. */
     var filler;
     if (D.lipOn) {
-      var r = D.hinge.rk + D.hinge.c + D.T0;
+      var r = D.hinge.R + D.T0;
       var keep = D.lipC + D.lipH * D.lipH / (2 * r), zLip = Math.min(top, D.zP + D.lipH + D.lipC + 0.4);
       filler = union(S, [prism(S, [interiorRing(D, keep)], D.zP + gap, zLip),
                          zLip < top ? prism(S, [interiorRing(D, -0.05)], zLip, top) : null]);
@@ -1241,10 +1296,72 @@ window.CS = window.CS || {};
   }
 
   /* ── hinge (canonical frame: hinge edge at +y) ──────────────────── */
+  /* The horn behind a knuckle (see describe): the hull of the knuckle and the
+     horn's outline, which lies above the parting line for the base, below it
+     (flip) for the lid. */
+  function horn(S, hg, s, flip, seg) {
+    if (!hg.horn) return null;
+    var pts = [];
+    hg.horn.forEach(function (q) {
+      var y = hg.ya + q[0], z = hg.za + (flip ? -q[1] : q[1]);
+      pts.push([s.x0, y, z], [s.x1, y, z]);
+    });
+    return hullOf(S, [cylX(S, s.x0, s.x1, hg.ya, hg.za, hg.rk, seg), hullPts(S, pts)]);
+  }
+
+  /* A 45° dovetail across x = xc: w0 wide at y0, w1 = w0 + 2h wide at y0 + h,
+     from z0 to z1. */
+  function dovetail(S, xc, y0, w0, h, z0, z1) {
+    var w1 = w0 + 2 * h;
+    return prism(S, [[[xc - w0 / 2, y0], [xc + w0 / 2, y0], [xc + w1 / 2, y0 + h], [xc - w1 / 2, y0 + h]]], z0, z1);
+  }
+
+  /* A slide-in leaf, drawn as a base leaf (below the parting line; a lid
+     leaf is its mirror): the knuckle on a plate against the wall, Hp tall,
+     with a dovetail slot open at the bottom and closed `cap` short of the
+     top, so it slides down onto its rail and stops. */
+  function leafSolid(S, D, hg, s, Hp) {
+    var lv = hg.leaf, zP = hg.za, y0 = D.Lc / 2, xc = (s.x0 + s.x1) / 2, seg = D.seg;
+    var cyl = cylX(S, s.x0, s.x1, hg.ya, zP, hg.rk, seg);
+    var plate = box(S, s.x0, y0, zP - Hp, s.x1, hg.ya, zP);
+    var body = union(S, [cyl, inter(S, hullOf(S, [cyl, plate]), box(S, s.x0, y0, zP - Hp, s.x1, hg.ya + hg.rk + 1, zP)),
+                         horn(S, hg, s, false, seg)]);
+    var slot = union(S, [dovetail(S, xc, y0, lv.wn, lv.dr, zP - Hp - 1, zP - lv.cap),
+                         box(S, xc - lv.wn / 2, y0 - 1, zP - Hp - 1, xc + lv.wn / 2, y0 + 0.01, zP - lv.cap)]);
+    return sub(S, body, slot);
+  }
+  /* The rail it slides onto: the slot less the fit all round, rooted in the
+     wall, with a 45° start at the bottom so it prints without support. */
+  function leafRail(S, D, hg, s, Hp) {
+    var lv = hg.leaf, zP = hg.za, y0 = D.Lc / 2, xc = (s.x0 + s.x1) / 2;
+    var w0 = lv.wn - 2 * lv.fit * Math.SQRT2, h = lv.dr - lv.fit;
+    var zb = zP - Hp, zt = zP - lv.cap - lv.fit;
+    var body = hullOf(S, [dovetail(S, xc, y0, w0, h, zb + h, zt), box(S, xc - w0 / 2, y0 - 0.01, zb, xc + w0 / 2, y0, zb + 0.01)]);
+    return union(S, [body, box(S, xc - w0 / 2, y0 - 0.8, zb, xc + w0 / 2, y0 + 0.01, zt)]);
+  }
+
   function addHinge(S, D, base, lid) {
     var hg = D.hinge;
-    if (!hg.ok || !hg.segments.length) return { base: base, lid: lid };
-    var Lc = D.Lc, seg = D.seg, rk = hg.rk;
+    if (!hg.ok || !hg.segments.length) return { base: base, lid: lid, leaves: [] };
+    var Lc = D.Lc, seg = D.seg, rk = hg.rk, za = hg.za;
+    var pins = union(S, hg.groups.map(function (g) {
+      var ps = Math.max(16, Math.round(seg / 2));
+      return cylX(S, g.x0 - 1, g.x1 + 1, hg.ya, hg.za, holeR(hg.pinR, ps), ps);
+    }));
+
+    if (hg.style === 'leaves') {
+      var flip = function (m) { return m ? S.k(S.k(m.mirror([0, 0, 1])).translate([0, 0, 2 * za])) : null; };
+      var railsB = [], railsL = [], leaves = [];
+      hg.segments.forEach(function (s) {
+        var isB = s.owner === 'base', Hp = isB ? za - hg.chinBase : hg.chinLid - za;
+        var leaf = leafSolid(S, D, hg, s, Hp), rail = leafRail(S, D, hg, s, Hp);
+        if (!isB) { leaf = flip(leaf); rail = flip(rail); }
+        (isB ? railsB : railsL).push(rail);
+        leaves.push({ m: sub(S, leaf, pins), owner: s.owner });
+      });
+      return { base: union(S, [base].concat(railsB)), lid: union(S, [lid].concat(railsL)), leaves: leaves };
+    }
+
     var ov = Math.max(0.4, D.T0 / 2 - D.lipC / 2 - 0.05);
     var baseBits = [], lidBits = [];
 
@@ -1261,16 +1378,12 @@ window.CS = window.CS || {};
       // The hull gives the knuckle a 45° chin, so it prints without support.
       // Clipped at the parting line, or it would reach across into the other half.
       var chin = inter(S, hullOf(S, [cyl, strip]), clipBox);
-      (s.owner === 'base' ? baseBits : lidBits).push(cyl, chin);
+      (s.owner === 'base' ? baseBits : lidBits).push(cyl, chin, horn(S, hg, s, s.owner === 'lid', seg));
     });
 
     base = union(S, [base].concat(baseBits));
     lid = union(S, [lid].concat(lidBits));
-    var pins = union(S, hg.groups.map(function (g) {
-      var ps = Math.max(16, Math.round(seg / 2));
-      return cylX(S, g.x0 - 1, g.x1 + 1, hg.ya, hg.za, holeR(hg.pinR, ps), ps);
-    }));
-    return { base: sub(S, base, pins), lid: sub(S, lid, pins) };
+    return { base: sub(S, base, pins), lid: sub(S, lid, pins), leaves: [] };
   }
 
   /* ── clasps (canonical frame: clasp edge at -y) ─────────────────── */
@@ -1520,6 +1633,8 @@ window.CS = window.CS || {};
       lid = turn(S, clasped.lid, -th);
       D.latchBoxes = (clasped.hooks || []).map(function (h) { return h.boundingBox(); });
       var hooks = (clasped.hooks || []).map(function (h) { return turn(S, h, -th); });
+      D.leafBoxes = hinged.leaves.map(function (l) { return l.m.boundingBox(); });
+      var leaves = hinged.leaves.map(function (l) { return { m: turn(S, l.m, -th), owner: l.owner }; });
 
       /* Decoration on the two outside faces. */
       var decor = opts.decor === false || typeof document === 'undefined'
@@ -1543,6 +1658,17 @@ window.CS = window.CS || {};
             'its hub, melt the pin head over, then turn it to thread the tip through the eye on the base.'
           : 'Each latch is three pieces: lugs on the case, plus a separate hook printed on its side. ' +
             'Pin the hook to the lid lugs and fit a catch pin through the base lugs — both 1.75 mm filament.' });
+      }
+      leaves.forEach(function (l, i) {
+        var part = toPart(l.m, 'leaf' + (i + 1), 'Hinge leaf ' + (i + 1) + (l.owner === 'base' ? ' (base)' : ' (lid)'),
+                          l.owner === 'base' ? state.colors.base : state.colors.lid, l.owner === 'base' ? 'leafB' : 'leafL');
+        part.leaf = i;
+        parts.push(part);
+      });
+      if (leaves.length) {
+        warnings0.push({ level: 'ok', msg: 'Each hinge knuckle is a leaf of its own, printed standing on end. Slide the base ' +
+          'leaves down onto their rails and the lid leaves up onto theirs, then push the pin through: it holds them all on. ' +
+          'A drop of superglue on each rail takes up any rattle.' });
       }
       parts = parts.filter(function (p) { return p.indices.length; });
 
@@ -1753,16 +1879,24 @@ window.CS = window.CS || {};
   }
 
   /* Returns a function mapping (x, y, z) of a part to where it is shown.
-     The base never moves; the lid swings about the hinge. For printing it
-     swings the full 180°, comes down onto the bed beside the base and steps
-     away from it, so the pair lies like an opened clamshell. */
+     The base never moves; the lid swings about the hinge, no further than its
+     stop. For printing it swings the full 180°, comes down onto the bed
+     beside the base and steps away from it, so the pair lies like an opened
+     clamshell. Hinge leaves (leafB, leafL) go with their half, and for
+     printing stand on end in a row out in front. */
   CS.poseFor = function (D, who, mode, angle) {
     var half = typeof who === 'string' ? who : who.half;
     if (half === 'latch' && mode === 'print') return latchPrint(D, who.latch || 0);
-    if ((half !== 'lid' && half !== 'latch') || mode === 'closed') return null;
-    if (mode === 'open') return axisRot(D.axis, angle == null ? 105 : angle);
+    if ((half === 'leafB' || half === 'leafL') && mode === 'print') return leafPrint(D, who.leaf || 0);
+    if ((half !== 'lid' && half !== 'latch' && half !== 'leafL') || mode === 'closed') return null;
+    if (mode === 'open') {
+      var a = angle == null ? 105 : angle;
+      return axisRot(D.axis, D.axis.stop ? Math.min(a, D.axis.stop) : a);
+    }
     var rot = axisRot(D.axis, 180);
-    var lift_ = D.zT - 2 * D.zP, sep = 8;
+    // Far enough apart that knuckles and horns, which reach hg.back behind
+    // the axis on both halves, don't meet.
+    var lift_ = D.zT - 2 * D.zP, sep = Math.max(8, 2 * (D.hinge.back || 0) + 2);
     return function (x, y, z) {
       var q = rot(x, y, z);
       return [q[0] + D.axis.n[0] * sep, q[1] + D.axis.n[1] * sep, q[2] + lift_];
@@ -1791,6 +1925,35 @@ window.CS = window.CS || {};
       var ad = a[0] * v[0] + a[1] * v[1] + a[2] * v[2];
       var cx = a[1] * v[2] - a[2] * v[1], cy = a[2] * v[0] - a[0] * v[2], cz = a[0] * v[1] - a[1] * v[0];
       return [T[0] + cx + a[0] * ad, T[1] + cy + a[1] * ad, T[2] + cz + a[2] * ad];
+    };
+  }
+
+  /* A hinge leaf stands on end for printing, its pin hole upright, so every
+     layer is a whole ring. They stand in a row out past the clasp edge,
+     beyond any latch hooks. */
+  function leafPrint(D, i) {
+    var all = D.leafBoxes || [], B = all[i];
+    if (!B) return null;
+    var dz = function (b) { return b.max[2] - b.min[2]; }, dy = function (b) { return b.max[1] - b.min[1]; };
+    var pitch = 4, row = 0, deep = 0;
+    all.forEach(function (b) { row += dz(b) + pitch; deep = Math.max(deep, dy(b)); });
+    row -= pitch;
+    var at = -row / 2;
+    for (var j = 0; j < i; j++) at += dz(all[j]) + pitch;
+    var hooks = 0;
+    (D.latchBoxes || []).forEach(function (b) {
+      var e = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+      hooks = Math.max(hooks, 8 + 1.5 * e + (b.max[1] - b.min[1]) + 6);
+    });
+    var out = D.Lc / 2 + 8 + hooks + (D.claspType === 'snap' || D.claspType === 'press' ? 6 : 0);
+    var u0 = at + dz(B) / 2, v0 = -out - deep / 2;
+    var zc = (B.min[2] + B.max[2]) / 2, yc = (B.min[1] + B.max[1]) / 2, th = D.theta;
+    return function (x, y, z) {
+      // Back to the hinge's frame, then stood up: its x up, z along the row,
+      // y across it (a proper rotation, so the mesh stays outside-out).
+      var c = rotPt(x, y, th);
+      var q = rotPt(u0 - (z - zc), v0 + (c[1] - yc), -th);
+      return [q[0], q[1], c[0] - B.min[0]];
     };
   }
 
@@ -1832,13 +1995,14 @@ window.CS = window.CS || {};
     return x1 >= x0 ? { minX: x0, maxX: x1, minY: y0, maxY: y1 } : null;
   }
 
-  /* One plate or two? The base goes on plate 1; with two, the lid and any
-     latch hooks (lid coloured) go on plate 2. "auto" splits when the base and
+  /* One plate or two? The base and its hinge leaves go on plate 1; with
+     two, the lid, its hinge leaves and any latch hooks (lid coloured) go on
+     plate 2. "auto" splits when the base and
      lid are different colours, so neither plate needs a filament swap for
      its body, or when the two only fit the bed apart. Returns { split, why,
-     hooks (are there any), plateOf: { half: index }, shifts: [{ dx, dy }]
+     hooks and leaves (are there any on the lid), plateOf: { half: index }, shifts: [{ dx, dy }]
      (the 3MF's placement, from WB.plateShifts), footprints: [{ w, d }] }. */
-  var isBase = function (h) { return h === 'base'; }, isLid = function (h) { return h !== 'base'; };
+  var isBase = function (h) { return h === 'base' || h === 'leafB'; }, isLid = function (h) { return !isBase(h); };
   CS.printPlates = function (model, state) {
     var bed = state.bed, mode = state.plates || 'auto';
     var bb = printBounds(model, isBase), lb = printBounds(model, isLid);
@@ -1853,7 +2017,8 @@ window.CS = window.CS || {};
     return {
       split: split, why: why,
       hooks: model.parts.some(function (p) { return p.half === 'latch'; }),
-      plateOf: { base: 0, lid: split ? 1 : 0, latch: split ? 1 : 0 },
+      leaves: model.parts.some(function (p) { return p.half === 'leafL'; }),
+      plateOf: { base: 0, leafB: 0, lid: split ? 1 : 0, latch: split ? 1 : 0, leafL: split ? 1 : 0 },
       shifts: split ? WB.plateShifts([bb, lb], bed) : [{ dx: 0, dy: 0 }],
       footprints: split ? [size(bb), size(lb)] : [CS.printFootprint(model)]
     };

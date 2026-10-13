@@ -15,14 +15,25 @@ function check(name, ok, detail) {
   else { failed++; console.log('  FAIL ' + name + (detail ? ' — ' + detail : '')); }
 }
 
-/* Volume shared by the base and the lid in a given pose. */
+/* Volume shared by the base side and the lid side (each with its hinge
+   leaves, if any) in a given pose. */
+function sideOf(model, lid, mode, angle) {
+  const ps = model.parts.filter(p => lid ? (p.key === 'lid' || p.half === 'leafL') : (p.key === 'base' || p.half === 'leafB'));
+  const ms = ps.map(p => toManifold(wasm, p, CS.poseFor(model.D, p, mode, angle)));
+  const u = ms.length === 1 ? ms[0] : wasm.Manifold.union(ms);
+  if (ms.length > 1) ms.forEach(m => m.delete());
+  return u;
+}
 function clash(model, mode, angle) {
-  const b = model.parts.find(p => p.half === 'base' && p.key === 'base');
-  const l = model.parts.find(p => p.half === 'lid' && p.key === 'lid');
-  const mb = toManifold(wasm, b), ml = toManifold(wasm, l, CS.poseFor(model.D, 'lid', mode, angle));
+  const mb = sideOf(model, false, mode, angle), ml = sideOf(model, true, mode, angle);
   const i = mb.intersect(ml), v = i.volume();
   [mb, ml, i].forEach(m => m.delete());
   return v;
+}
+/* The same with the stop lifted, to pose the lid past it. */
+function clashPast(model, angle) {
+  const D = Object.assign({}, model.D, { axis: Object.assign({}, model.D.axis, { stop: null }) });
+  return clash(Object.assign({}, model, { D }), 'open', angle);
 }
 
 function variants() {
@@ -128,6 +139,17 @@ function variants() {
   it2.split = 0.5;   // standing 18650s, half held, need the lid to take the rest
   out.push(['custom shapes, SD slots, standing 18650', it2]);
 
+  const lv = CS.defaults();
+  lv.hinge.style = 'leaves';
+  out.push(['slide-in hinge leaves, snap clasp', lv]);
+  const lv2 = CS.defaults();
+  lv2.hinge.style = 'leaves'; lv2.hinge.side = 'right'; lv2.hinge.count = 1; lv2.hinge.stop = 180; lv2.clasp.type = 'hook';
+  lv2.clasp.count = 1; lv2.clasp.width = 22;
+  out.push(['slide-in leaves without a stop, hinge right, hook latch', lv2]);
+  const nr = CS.defaults();
+  nr.hinge.stop = 180; nr.hinge.diameter = 8;
+  out.push(['reinforced hinge without a stop, 8 mm knuckles', nr]);
+
   const tr = CS.defaults();
   tr.build = 'tray'; tr.gridfinity.enabled = true; tr.texture.enabled = true; tr.texture.pattern = 'bricks';
   out.push(['gridfinity tray (base only), bricks', tr]);
@@ -190,11 +212,44 @@ for (const [name, state] of variants()) {
     check('only the snap hooks resist opening', v5 < hook, v5.toFixed(2) + ' mm³ vs hook ' + hook.toFixed(2));
   }
   let worst = 0, at = 0;
-  for (let a = 5; a <= 180; a += 5) {
+  const stop = model.D.axis.stop || 180;
+  for (let a = 5; a <= stop; a += 5) {
     const v = clash(swing, 'open', a);
     if (v > worst) { worst = v; at = a; }
   }
-  check('lid swings to 180° without hitting the base', worst < 1e-3, worst.toFixed(4) + ' mm³ at ' + at + '°');
+  if (stop % 5) { const v = clash(swing, 'open', stop); if (v > worst) { worst = v; at = stop; } }
+  check('lid swings to ' + stop + '° without hitting the base', worst < 1e-3, worst.toFixed(4) + ' mm³ at ' + at + '°');
+  if (model.D.hinge.stop) {
+    // Just past the stop, the horns meet the other half's wall, face to face.
+    const v3 = clashPast(swing, stop + 3), v10 = clashPast(swing, stop + 10);
+    check('the stop holds the lid past ' + stop + '°', v3 > 1 && v10 > v3, v3.toFixed(2) + ' then ' + v10.toFixed(2) + ' mm³');
+  }
+  const leaves = model.parts.filter(p => p.half === 'leafB' || p.half === 'leafL');
+  if (state.hinge.style === 'leaves') {
+    check('one leaf per knuckle', leaves.length === model.D.hinge.segments.length, leaves.length + ' leaves');
+    const host = { leafB: toManifold(wasm, model.parts.find(p => p.key === 'base')), leafL: toManifold(wasm, model.parts.find(p => p.key === 'lid')) };
+    let onRail = 0, held = true;
+    for (const p of leaves) {
+      const L = toManifold(wasm, p), i = L.intersect(host[p.half]);
+      onRail = Math.max(onRail, i.volume());
+      // Pulled 0.6 mm straight off the wall, a leaf runs into its rail's dovetail.
+      const n = model.D.axis.n, off = L.translate([n[0] * 0.6, n[1] * 0.6, 0]), j = off.intersect(host[p.half]);
+      if (j.volume() < 1e-2) held = false;
+      [L, i, off, j].forEach(m => m.delete());
+    }
+    Object.values(host).forEach(m => m.delete());
+    check('leaves sit on their rails without overlapping them', onRail < 1e-3, onRail.toFixed(4) + ' mm³');
+    check('the dovetail keeps every leaf from pulling off the wall', held);
+    const posed = model.parts.map(p => toManifold(wasm, p, CS.poseFor(model.D, p, 'print')));
+    let apart = 0;
+    for (let i = 0; i < posed.length; i++) for (let j = i + 1; j < posed.length; j++) {
+      const x = posed[i].intersect(posed[j]); apart = Math.max(apart, x.volume()); x.delete();
+    }
+    posed.forEach(m => m.delete());
+    check('every piece lies apart on the print bed', apart < 1e-3, apart.toFixed(4) + ' mm³');
+    const low = leaves.map(p => { const q = CS.posed(p, CS.poseFor(model.D, p, 'print')).positions; let m = Infinity; for (let i = 2; i < q.length; i += 3) m = Math.min(m, q[i]); return m; });
+    check('leaves stand on the bed', low.every(z => Math.abs(z) < 1e-3), low.map(z => z.toFixed(3)).join(','));
+  }
   const hooks = model.parts.filter(p => p.half === 'latch');
   if (state.clasp.type === 'hook' || state.clasp.type === 'swing') {
     check('one hook per latch', hooks.length === model.D.clasps.length, hooks.length + ' hooks');
