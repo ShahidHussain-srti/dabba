@@ -146,6 +146,12 @@ function variants() {
   lv2.hinge.style = 'leaves'; lv2.hinge.side = 'right'; lv2.hinge.count = 1; lv2.hinge.stop = 180; lv2.clasp.type = 'hook';
   lv2.clasp.count = 1; lv2.clasp.width = 22;
   out.push(['slide-in leaves without a stop, hinge right, hook latch', lv2]);
+  const lv3 = CS.defaults();
+  lv3.hinge.style = 'leaves'; lv3.hinge.autoD = false; lv3.hinge.diameter = 3; lv3.hinge.knuckles = 5;
+  out.push(['slide-in leaves, 3 mm knuckles, 5 per hinge (small dovetails)', lv3]);
+  const lv4 = CS.defaults();
+  lv4.hinge.style = 'leaves'; lv4.hinge.knuckles = 7;
+  out.push(['slide-in leaves too short, built reinforced instead', lv4]);
   const nr = CS.defaults();
   nr.hinge.stop = 180; nr.hinge.diameter = 8;
   out.push(['reinforced hinge without a stop, 8 mm knuckles', nr]);
@@ -182,6 +188,12 @@ for (const [name, state] of variants()) {
             g.nx + '×' + g.ny + ' → ' + model.D.W + '×' + model.D.L);
     }
     continue;
+  }
+  const hg = model.D.hinge;
+  if (hg.ok) {
+    const want = Math.min(6, Math.max(1, Math.round(state.hinge.count))) * Math.min(9, Math.max(2, Math.round(state.hinge.knuckles)));
+    check('every knuckle is built, on both halves', hg.segments.length === want && hg.segments.some(q => q.owner === 'lid'),
+          hg.segments.length + ' of ' + want);
   }
   const closed = clash(model, 'closed');
   check('base and lid do not overlap when closed', closed < 1e-3, closed.toFixed(4) + ' mm³');
@@ -225,7 +237,11 @@ for (const [name, state] of variants()) {
     check('the stop holds the lid past ' + stop + '°', v3 > 1 && v10 > v3, v3.toFixed(2) + ' then ' + v10.toFixed(2) + ' mm³');
   }
   const leaves = model.parts.filter(p => p.half === 'leafB' || p.half === 'leafL');
-  if (state.hinge.style === 'leaves') {
+  if (state.hinge.style === 'leaves' && !model.D.hinge.leaf) {
+    check('knuckles too short for leaves fall back to the reinforced style', model.D.hinge.ok && !leaves.length &&
+          model.warnings.some(w => /built in the reinforced style instead/.test(w.msg)));
+  }
+  if (model.D.hinge.leaf) {
     check('one leaf per knuckle', leaves.length === model.D.hinge.segments.length, leaves.length + ' leaves');
     const host = { leafB: toManifold(wasm, model.parts.find(p => p.key === 'base')), leafL: toManifold(wasm, model.parts.find(p => p.key === 'lid')) };
     let onRail = 0, held = true;

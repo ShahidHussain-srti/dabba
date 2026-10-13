@@ -91,6 +91,7 @@ window.CS = window.CS || {};
       lidInner: { mode: 'open', gap: 0.8, depth: 'mirror' },
       hinge: { side: 'back', count: 2, knuckles: 3, length: 24, diameter: 6, pin: 2.1,
                gap: 0.4, clearance: 0.4, inset: 10,
+               autoD: true,           // knuckle diameter follows the style and stop (CS.autoKnuckle)
                style: 'reinforced',   // reinforced | leaves (each knuckle printed on end, slid onto a rail)
                stop: 120,             // the lid opens this far, then rests on the stop; 180 for none
                fit: 0.15 },           // slide-in leaves: clearance on each side of the rail
@@ -172,6 +173,18 @@ window.CS = window.CS || {};
      text, engraved recesses and colour inlays alike. Depths snap up to whole
      layers so they land on slice boundaries. */
   CS.MIN_LAYERS = 3;
+
+  /* The knuckle diameter when it is left automatic. A reinforced hinge's
+     horns shrink as the stop opens up past about 150°, so the knuckle grows
+     in step with the stop: 6 mm at 120° or less, rising evenly to 8 mm at
+     180° (no stop). Slide-in leaves get their strength from how they print,
+     so they stay at 6 mm. */
+  CS.autoKnuckle = function (state) {
+    var H = state.hinge;
+    if (H.style === 'leaves') return 6;
+    var stop = isFinite(H.stop) ? H.stop : 180;
+    return CS.tidy(6 + 2 * WB.clamp((stop - 120) / 60, 0, 1));
+  };
 
   CS.layerHeightOf = function (state) { return Math.max(0.02, state.layerHeight || 0.2); };
 

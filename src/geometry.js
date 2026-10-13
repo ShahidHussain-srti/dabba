@@ -200,14 +200,9 @@ window.CS = window.CS || {};
     if (D.tray) warn = [];
     var n = WB.clamp(Math.round(H.count), 1, 6), k = WB.clamp(Math.round(H.knuckles), 2, 9);
     var rk = Math.max(1.5, H.diameter / 2), c = WB.clamp(H.clearance, 0.1, 1.5);
-    // Reinforced with no stop has no room for horns (below), so the knuckles
-    // grow instead: 8 mm leaves about 50% more ring around the pin than 6.
-    var bare = H.style !== 'leaves' && !(isFinite(H.stop) && H.stop < 179.5);
-    if (bare && rk < 4 && !D.tray) {
-      warn.push({ level: 'ok', msg: 'With no stop there is no room for the horns, so the knuckles are made 8 mm across (from ' +
-        (rk * 2).toFixed(1) + ' mm) to keep them strong. A stop of 110–130° strengthens them more.' });
-      rk = 4;
-    }
+    // Left automatic, the knuckle grows as the stop opens up and the horns
+    // (below) shrink; the app shows that size in the field.
+    if (H.autoD !== false) rk = CS.autoKnuckle(state) / 2;
     var gap = WB.clamp(H.gap, 0.1, 2);
     var inset = Math.max(H.inset, D.R + 1);
     var span0 = -Wc / 2 + inset, span1 = Wc / 2 - inset, avail = span1 - span0;
@@ -237,16 +232,34 @@ window.CS = window.CS || {};
     hg.R = rk + c;                                   // axis to the case wall
     if (hg.style === 'leaves') {
       // The slot is a 45° dovetail, so each flank prints as a 45° overhang.
-      var lv = { fit: WB.clamp(H.fit, 0.05, 0.5), dr: 1.5, cap: 1.2 };
-      lv.ww = Math.min(hg.kl - 2, 7);
+      // It fills the knuckle's length less 0.8 mm a side, and on a short
+      // knuckle gets shallower (down to 0.8 mm) before giving up; the rail's
+      // neck must stay at least 0.6 mm once the fit is taken off both sides.
+      var lv = { fit: WB.clamp(H.fit, 0.05, 0.5), cap: 1.2 };
+      var neck = Math.max(1.2, 2 * lv.fit * Math.SQRT2 + 0.6);
+      lv.ww = Math.min(hg.kl - 1.6, 7);
+      lv.dr = Math.min(1.5, (lv.ww - neck) / 2);
       lv.wn = lv.ww - 2 * lv.dr;
-      if (lv.wn < 1.2 && hg.ok) {
-        hg.ok = false;
-        warn.push({ level: 'bad', msg: 'Knuckles ' + hg.kl.toFixed(1) + ' mm long are too short for slide-in leaves: each needs about ' +
-          (3.2 + 2 * lv.dr).toFixed(1) + ' mm for its rail. Use fewer knuckles or a longer hinge.' });
+      // The pad is as tall as its rail needs (4 mm of full rail past the
+      // lead-in and the slot's closed end), whatever the knuckle size, as far
+      // as the case allows; never shorter than a knuckle's chin (below).
+      var want = lv.cap + Math.max(lv.dr, 0.8) + 4;
+      lv.zb = Math.max(Math.min(D.zP - 2.4 * rk, D.zP - want), D.eb + 0.4);
+      lv.zt = Math.min(Math.max(D.zP + 2.4 * rk, D.zP + want), D.zT - D.et - 0.4);
+      var room = Math.min(D.zP - lv.zb, lv.zt - D.zP) - lv.cap - lv.dr;
+      // Where leaves can't work, the hinge is still built, the reinforced way.
+      var why = lv.dr < 0.8
+        ? 'Knuckles ' + (Math.floor(hg.kl * 10) / 10).toFixed(1) + ' mm long are too short for slide-in leaves (each needs ' +
+          (3.2 + neck).toFixed(1) + ' mm for its rail; use fewer knuckles or a longer hinge)'
+        : room < 2 ? 'The ' + (D.zP - lv.zb < lv.zt - D.zP ? 'base' : 'lid') + ' is too shallow for slide-in leaves (their rails would be only ' +
+          Math.max(0, room).toFixed(1) + ' mm long)' : null;
+      if (why && hg.ok) {
+        warn.push({ level: 'warn', msg: why + ', so the hinge is built in the reinforced style instead.' });
+        hg.style = 'reinforced';
+      } else if (!why) {
+        hg.R = Math.max(rk + c, rk + lv.dr + 1);     // the slot stays clear of the ring
+        hg.leaf = lv;
       }
-      hg.R = Math.max(rk + c, rk + lv.dr + 1);       // the slot stays clear of the ring
-      hg.leaf = lv;
     }
     hg.ya = Lc / 2 + hg.R;
     // The stop: the horn's top lies where the other half's wall face is at
@@ -272,12 +285,22 @@ window.CS = window.CS || {};
         var r = Math.min(2, 0.45 * (yH - T0p[0])), nY = -dzl, nZ = dy;       // the face's normal, towards the other half
         // Pulled in further on a tapered wall, whose face is tilted to the
         // radius there, so the circle stays under the face (a hair's margin).
-        var cb = Math.cos(Math.atan(D.tanO || 0)), k = (r + (r * (1 - cb) + 0.02) / cb) / R0;
-        var cT = [T0p[0] * (1 - k), T0p[1] * (1 - k)];
-        var qy = yH - r, cQ = [qy, (nY * T0p[0] + nZ * T0p[1] - r - nY * qy) / nZ];
-        var cL = [qy, qy - (rk - r) * Math.SQRT2];
-        hg.horn = { r: r, at: cL[1] < cQ[1] ? [cT, cQ, cL] : [cT, cQ] };
-        hg.back = Math.max(rk, yH);
+        var cb = Math.cos(Math.atan(D.tanO || 0)), kIn = (r + (r * (1 - cb) + 0.02) / cb) / R0;
+        var cT = [T0p[0] * (1 - kIn), T0p[1] * (1 - kIn)];
+        var qy = yH - r, dS = nY * T0p[0] + nZ * T0p[1] - r, e45 = (rk - r) * Math.SQRT2;
+        var cQ = [qy, (dS - nY * qy) / nZ], at;
+        if (cQ[0] - cQ[1] > e45) {
+          // Low enough that the underside would flatten out: slide the corner
+          // up the stop face until it sits on the 45° tangent.
+          var y45 = (dS + nZ * e45) / (nY + nZ);
+          cQ = [y45, y45 - e45];
+          at = [cT, cQ];
+        } else {
+          var cL = [qy, qy - e45];
+          at = cL[1] < cQ[1] ? [cT, cQ, cL] : [cT, cQ];
+        }
+        hg.horn = { r: r, at: at };
+        hg.back = Math.max(rk, cQ[0] + r);
       }
     }
     if (hg.ok) {
@@ -297,16 +320,6 @@ window.CS = window.CS || {};
     }
     hg.chinBase = Math.max(D.zP - 1.2 * rk * 2, D.eb + 0.4);
     hg.chinLid = Math.min(D.zP + 1.2 * rk * 2, D.zT - D.et - 0.4);
-    if (hg.leaf && hg.ok) {
-      // A leaf needs room below its slot's closed end for a rail worth having.
-      var room = Math.min(D.zP - hg.chinBase, hg.chinLid - D.zP) - hg.leaf.cap - hg.leaf.dr;
-      if (room < 2) {
-        hg.ok = false;
-        warn.push({ level: 'bad', msg: 'The case is too shallow for slide-in hinge leaves: their rails would be only ' +
-          Math.max(0, room).toFixed(1) + ' mm long. Use a taller ' + (D.zP - hg.chinBase < hg.chinLid - D.zP ? 'base' : 'lid') +
-          ', a smaller knuckle diameter, or the reinforced style.' });
-      }
-    }
     if (D.zP - hg.chinBase < rk || hg.chinLid - D.zP < rk) {
       warn.push({ level: 'warn', msg: 'The hinge knuckles are large for a case this shallow, so their supports are short. ' +
         'A smaller knuckle diameter or a taller ' + (D.zP - hg.chinBase < rk ? 'base' : 'lid') + ' prints more reliably.' });
@@ -463,7 +476,9 @@ window.CS = window.CS || {};
       var along = sideName === 'front' || sideName === 'back' ? 0 : 1;
       D.plainZones.push({ side: sideName, a0: Math.min(p0[along], p1[along]), a1: Math.max(p0[along], p1[along]), z0: z0, z1: z1 });
     };
-    hg.groups.forEach(function (g) { zone(side, Lc / 2, g.x0 - 1, g.x1 + 1, hg.chinBase - 0.5, hg.chinLid + 0.5); });
+    hg.groups.forEach(function (g) {
+      zone(side, Lc / 2, g.x0 - 1, g.x1 + 1, (hg.leaf ? hg.leaf.zb : hg.chinBase) - 0.5, (hg.leaf ? hg.leaf.zt : hg.chinLid) + 0.5);
+    });
     D.clasps.forEach(function (q) {
       var x0 = q.xc - q.w / 2 - 1, x1 = q.xc + q.w / 2 + 1;
       if (C.type === 'snap') {
@@ -1334,13 +1349,15 @@ window.CS = window.CS || {};
   }
 
   /* A slide-in leaf, drawn as a base leaf (below the parting line; a lid
-     leaf is its mirror): the knuckle on a plate against the wall, Hp tall,
-     with a dovetail slot open at the bottom and closed `cap` short of the
-     top, so it slides down onto its rail and stops. */
+     leaf is its mirror). It looks like a knuckle printed on the case: the
+     knuckle with a chin sloping down to a pad against the wall, Hp tall and
+     just thick enough for a dovetail slot with 1.2 mm behind it. The slot is
+     open at the bottom and closed `cap` short of the top, so the leaf slides
+     down onto its rail and stops. */
   function leafSolid(S, D, hg, s, Hp) {
     var lv = hg.leaf, zP = hg.za, y0 = D.Lc / 2, xc = (s.x0 + s.x1) / 2, seg = D.seg;
     var cyl = cylX(S, s.x0, s.x1, hg.ya, zP, hg.rk, seg);
-    var plate = box(S, s.x0, y0, zP - Hp, s.x1, hg.ya, zP);
+    var plate = box(S, s.x0, y0, zP - Hp, s.x1, Math.min(hg.ya, y0 + lv.dr + 1.2), zP);
     var body = union(S, [cyl, inter(S, hullOf(S, [cyl, plate]), box(S, s.x0, y0, zP - Hp, s.x1, hg.ya + hg.rk + 1, zP)),
                          horn(S, hg, s, false, seg)]);
     var slot = union(S, [dovetail(S, xc, y0, lv.wn, lv.dr, zP - Hp - 1, zP - lv.cap),
@@ -1370,7 +1387,7 @@ window.CS = window.CS || {};
       var flip = function (m) { return m ? S.k(S.k(m.mirror([0, 0, 1])).translate([0, 0, 2 * za])) : null; };
       var railsB = [], railsL = [], leaves = [];
       hg.segments.forEach(function (s) {
-        var isB = s.owner === 'base', Hp = isB ? za - hg.chinBase : hg.chinLid - za;
+        var isB = s.owner === 'base', Hp = isB ? za - hg.leaf.zb : hg.leaf.zt - za;
         var leaf = leafSolid(S, D, hg, s, Hp), rail = leafRail(S, D, hg, s, Hp);
         if (!isB) { leaf = flip(leaf); rail = flip(rail); }
         (isB ? railsB : railsL).push(rail);

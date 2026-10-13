@@ -68,9 +68,11 @@ locked until you turn Fill off.
   - **Reinforced** (default): the knuckles print with the case, each with a horn behind it
     that makes that part of the ring thick. The horns are also a stop: the lid opens to the
     angle you set (120° by default) and then rests on whole faces instead of levering the
-    knuckles. The horns only fit where the lid never goes, so they shrink as the stop opens
-    up and are gone past about 150°. At 180° (no stop) the knuckles are made at least 8 mm
-    across instead.
+    knuckles. The horns only fit where the lid never goes, and their undersides keep to 45°
+    so they print unsupported; past about 150° they shrink, and at 180° there is no stop and
+    no horn. Left automatic (the default), the knuckle diameter grows with the stop to make
+    up for it: 6 mm at 120° or less, rising evenly to 8 mm at 180°. Untick *Automatic* to
+    set your own.
   - **Slide-in leaves**: every knuckle is a small piece of its own, printed standing on end so
     its ring lies within the layers. Each slides onto a 45° dovetail rail on the case, and the
     pin then holds them all on. *Rail fit* sets the clearance.

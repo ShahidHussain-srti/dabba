@@ -325,6 +325,14 @@
       ang.max = top;
       if (+ang.value > top) { ang.value = top; $('#open-angle-val').textContent = top + '°'; }
     }
+    // An automatic knuckle size follows the style and stop (CS.autoKnuckle);
+    // the field shows it, and starts from it when made manual.
+    var kd = $('#f-hinge-d'), kAuto = state.hinge.autoD !== false;
+    if (kAuto) state.hinge.diameter = CS.autoKnuckle(state);
+    if (kd) {
+      kd.disabled = kAuto;
+      if (document.activeElement !== kd && +kd.value !== state.hinge.diameter) kd.value = state.hinge.diameter;
+    }
     var lim = Math.ceil(Math.max(D.W, D.L) / 2) + 5;
     $$('[data-range=pos]').forEach(function (el) {
       el.min = -lim; el.max = lim;

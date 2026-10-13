@@ -408,10 +408,10 @@
           ring lies within its layers, the strongest way round. Each slides onto a dovetail rail on the case, and the pin
           then holds them all on; a drop of superglue takes up any rattle.</p>
         <div class="row num" data-num="hinge.stop" data-min="90" data-max="180" data-step="1" data-unit="°">Opens to</div>
-        <p class="hint">The lid stops here, held by the horns, which only fit where the lid never goes: the further it
-          opens, the smaller they get. 110–130° keeps most of their strength; past about 150° there is no room left.
-          At 180° there is no stop, and reinforced knuckles are made at least 8 mm across instead; slide-in leaves are
-          the stronger choice for a lid that has to open flat.</p>
+        <p class="hint">The lid stops here, held by the horns. They only fit where the lid never goes, so past about
+          150° they shrink, and at 180° there is no stop and no horn. With an automatic knuckle size, a reinforced
+          hinge's knuckles grow with the stop to make up for it: 6 mm at 120° or less, rising evenly to 8 mm at 180°.
+          Slide-in leaves are the stronger choice for a lid that has to open flat.</p>
         <div class="row num" data-num="hinge.fit" data-min="0.05" data-max="0.5" data-step="0.05" data-unit="mm" data-show="hinge.style:leaves">Rail fit</div>
         <p class="hint" data-show="hinge.style:leaves">Clearance on each side of the rail. 0.15 mm slides on with a firm push on
           most printers; go up if a leaf won't go on, down if it rattles.</p>
@@ -427,7 +427,8 @@
         <div class="row num" data-num="hinge.count" data-min="1" data-max="6" data-step="1" data-unit="">Hinges</div>
         <div class="row num" data-num="hinge.knuckles" data-min="2" data-max="9" data-step="1" data-unit="">Knuckles per hinge</div>
         <div class="row num" data-num="hinge.length" data-min="6" data-max="200" data-step="0.5" data-unit="mm">Hinge length</div>
-        <div class="row num" data-num="hinge.diameter" data-min="3" data-max="14" data-step="0.1" data-unit="mm">Knuckle diameter</div>
+        <div class="row num" data-num="hinge.diameter" data-id="f-hinge-d" data-min="3" data-max="14" data-step="0.1" data-unit="mm">Knuckle diameter</div>
+        <div class="row inlinerow"><label class="chk"><input type="checkbox" data-bind="hinge.autoD"> Automatic: follows the style and stop</label></div>
         <div class="row num" data-num="hinge.pin" data-min="1" data-max="4" data-step="0.05" data-unit="mm">Pin hole</div>
         <div class="row num" data-num="hinge.gap" data-min="0.1" data-max="1.5" data-step="0.05" data-unit="mm">Gap between knuckles</div>
         <div class="row num" data-num="hinge.clearance" data-min="0.1" data-max="1.5" data-step="0.05" data-unit="mm">Swing clearance</div>
