@@ -120,6 +120,12 @@ match your slicer. Pick your printer under Printer (Bambu Lab, Prusa, Creality H
 Anycubic, or a custom size) to see its bed under the print layout and be warned if the
 parts don't fit on it.
 
+The base and lid can print on one plate or a plate each. On **Automatic** (the default) they
+get a plate each when they are different colours, so neither plate needs a filament swap for
+its body, or when they only fit the bed apart; the Printer section says which it chose. The
+3MF then puts each on its own plate in Bambu Studio, OrcaSlicer and Creality Print, and a
+bed apart for other slicers, and the print layout shows a bed for each.
+
 Colours are assigned the way Bambu Studio writes its own files, so they come through in
 Bambu Studio, OrcaSlicer, Creality Print and PrusaSlicer, numbered from extruder 1 in the
 order they're used. Base and lid are separate objects, so you can print them in different

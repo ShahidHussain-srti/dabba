@@ -513,6 +513,37 @@ console.log('export');
   check('STL triangle count matches', sb.getUint32(80, true) === model.stats.tris);
 }
 
+console.log('plates');
+{
+  const s = CS.defaults();
+  s.colors.lid = '#ff0000';
+  const model = CS.buildModel(s, { decor: false });
+  const P = CS.printPlates(model, s);
+  check('different base and lid colours put them on a plate each', P.split && P.why === 'colours' && P.plateOf.lid === 1);
+  const files = await unzip(new Uint8Array(await (await CS.exportThreeMF(model, s, P)).arrayBuffer()));
+  const plates = [...files['Metadata/model_settings.config'].matchAll(/<plate>([\s\S]*?)<\/plate>/g)];
+  check('the 3MF lists two plates, one object on each', plates.length === 2 && plates.every(m => (m[1].match(/<model_instance>/g) || []).length === 1), plates.length + ' plates');
+  const xs = [...files['3D/3dmodel.model'].matchAll(/<item objectid="\d+" transform="([^"]+)"/g)].map(m => +m[1].split(' ')[9]);
+  check('the lid sits a bed and a bit along from the base', xs[1] - xs[0] > s.bed.w, xs.join(' '));
+
+  s.plates = 'one';
+  check('"One plate" keeps them together whatever the colours', !CS.printPlates(model, s).split);
+  const same = CS.defaults(); same.colors.lid = same.colors.base;
+  const m2 = CS.buildModel(same, { decor: false });
+  check('same colours, room on the bed: one plate', !CS.printPlates(m2, same).split);
+  // A square bed just big enough for the bigger of the two on its own.
+  const f = CS.printFootprint(m2), fb = CS.printFootprint(m2, h => h === 'base'), fl = CS.printFootprint(m2, h => h !== 'base');
+  const side = Math.ceil(Math.max(fb.w, fb.d, fl.w, fl.d) + 1);
+  same.bed = { show: true, w: side, d: side };
+  const P2 = CS.printPlates(m2, same);
+  check('same colours, too big together for the bed: a plate each', P2.split && P2.why === 'size',
+        JSON.stringify(f) + ' on ' + same.bed.w + ' × ' + same.bed.d);
+  same.plates = 'split';
+  check('"Base and lid apart" always splits', CS.printPlates(m2, same).split);
+  const tray = CS.defaults(); tray.build = 'tray'; tray.plates = 'split';
+  check('a tray is one plate', !CS.printPlates(CS.buildModel(tray, { decor: false }), tray).split);
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
 

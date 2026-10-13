@@ -1812,4 +1812,51 @@ window.CS = window.CS || {};
     });
   };
 
+  /* Width × depth of the print layout, as exported: of the parts whose
+     half passes `only`, or of all of them. */
+  CS.printFootprint = function (model, only) {
+    var b = printBounds(model, only);
+    return b ? { w: b.maxX - b.minX, d: b.maxY - b.minY } : { w: 0, d: 0 };
+  };
+  function printBounds(model, only) {
+    var D = model.D, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    model.parts.forEach(function (part) {
+      if (only && !only(part.half)) return;
+      var pose = CS.poseFor(D, part, 'print'), p = part.positions;
+      for (var i = 0; i < p.length; i += 3) {
+        var q = pose ? pose(p[i], p[i + 1], p[i + 2]) : [p[i], p[i + 1]];
+        if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0];
+        if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1];
+      }
+    });
+    return x1 >= x0 ? { minX: x0, maxX: x1, minY: y0, maxY: y1 } : null;
+  }
+
+  /* One plate or two? The base goes on plate 1; with two, the lid and any
+     latch hooks (lid coloured) go on plate 2. "auto" splits when the base and
+     lid are different colours, so neither plate needs a filament swap for
+     its body, or when the two only fit the bed apart. Returns { split, why,
+     hooks (are there any), plateOf: { half: index }, shifts: [{ dx, dy }]
+     (the 3MF's placement, from WB.plateShifts), footprints: [{ w, d }] }. */
+  var isBase = function (h) { return h === 'base'; }, isLid = function (h) { return h !== 'base'; };
+  CS.printPlates = function (model, state) {
+    var bed = state.bed, mode = state.plates || 'auto';
+    var bb = printBounds(model, isBase), lb = printBounds(model, isLid);
+    var size = function (b) { return b ? { w: b.maxX - b.minX, d: b.maxY - b.minY } : { w: 0, d: 0 }; };
+    var fits = function (f) { return !WB.bedWarning(f, bed, '', ''); };
+    var split = false, why = '';
+    if (bb && lb && mode !== 'one') {
+      if (mode === 'split') { split = true; why = 'chosen'; }
+      else if (String(state.colors.base).toUpperCase() !== String(state.colors.lid).toUpperCase()) { split = true; why = 'colours'; }
+      else if (!fits(CS.printFootprint(model)) && fits(size(bb)) && fits(size(lb))) { split = true; why = 'size'; }
+    }
+    return {
+      split: split, why: why,
+      hooks: model.parts.some(function (p) { return p.half === 'latch'; }),
+      plateOf: { base: 0, lid: split ? 1 : 0, latch: split ? 1 : 0 },
+      shifts: split ? WB.plateShifts([bb, lb], bed) : [{ dx: 0, dy: 0 }],
+      footprints: split ? [size(bb), size(lb)] : [CS.printFootprint(model)]
+    };
+  };
+
 })(window.CS);

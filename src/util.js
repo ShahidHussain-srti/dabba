@@ -76,6 +76,7 @@ window.CS = window.CS || {};
       },
       layerHeight: 0.2,
       bed: { show: false, w: 256, d: 256 },   // print bed drawn under the print layout, mm
+      plates: 'auto',                          // auto | one | split: base and lid on one plate or two
       quality: 'normal',
       fit: 0.4,                 // clearance around each object, per side
       headroom: 0.6,            // above the tallest object, inside the closed box

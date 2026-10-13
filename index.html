@@ -225,6 +225,16 @@
         <div class="row inlinerow"><label class="chk"><input type="checkbox" data-bind="bed.show"> Show the bed under the print layout</label></div>
         <p class="hint">Drawn in the 3D view's Print layout, with a 10 mm grid, and you are warned if the parts don't
           fit on it.</p>
+        <h3 data-hide="build:tray">Plates</h3>
+        <div class="seg small full" role="group" aria-label="Plates" data-bind="plates" data-hide="build:tray">
+          <button value="auto">Automatic</button>
+          <button value="one">One plate</button>
+          <button value="split">Base and lid apart</button>
+        </div>
+        <p class="hint" data-show="plates:auto" data-hide="build:tray">The base and lid get a plate each when they are
+          different colours, so each plate prints in one colour with no filament swaps between them, or when they
+          only fit the bed apart.</p>
+        <p class="hint" id="plates-readout" data-hide="build:tray"></p>
       </div>
     </section>
 

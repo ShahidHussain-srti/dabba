@@ -9,12 +9,14 @@ window.CS = window.CS || {};
 
   var APP = 'Dabba Case Studio';
 
-  CS.exportThreeMF = function (model, state) {
+  /* plates: from CS.printPlates — which plate the base, lid and hooks go on. */
+  CS.exportThreeMF = function (model, state, plates) {
     var parts = CS.printLayout(model), name = state.name || 'case';
+    plates = plates || CS.printPlates(model, state);
     return WB.export3MF({
-      app: APP, title: name,
+      app: APP, title: name, bed: state.bed,
       objects: [['base', ' base'], ['lid', ' lid'], ['latch', ' latch hooks']].map(function (o) {
-        return { name: name + o[1], parts: parts.filter(function (p) { return p.half === o[0]; }) };
+        return { name: name + o[1], plate: plates.plateOf[o[0]] + 1, parts: parts.filter(function (p) { return p.half === o[0]; }) };
       })
     });
   };

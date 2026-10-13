@@ -885,25 +885,45 @@
       return;
     }
     lastModel = model;
+    var plates = CS.printPlates(model, state);
+    paintPlates(plates);
     if (viewer && !viewer.failed) {
       var first = !viewer.count;
       viewer.bedState = state.bed;
+      viewer.plates = plates;
       viewer.setModel(model.parts, model.D, model.atlas);
       viewer.setOutline(state.selected);
       if (first) viewer.frame();
       viewer.draw();
     }
     stats(model, performance.now() - t0);
-    showWarnings(model.warnings.concat(bedWarnings(model)));
+    showWarnings(model.warnings.concat(bedWarnings(plates)));
   }, 180);
 
-  /* Does the print layout fit the bed? Turned a quarter, if that helps. */
-  function bedWarnings(model) {
+  /* Does the print layout fit the bed? Turned a quarter, if that helps; with
+     two plates, each plate on its own. */
+  function bedWarnings(plates) {
     var b = state.bed;
     if (!b || !b.show) return [];
-    var w = WB.bedWarning(CS.printFootprint(model), b, 'The print layout',
-      'Print the parts one at a time (most slicers can split a 3MF by object), or make the case smaller.');
+    if (plates.split) {
+      return plates.footprints.map(function (f, i) {
+        return WB.bedWarning(f, b, i ? 'The lid' : 'The base', 'Make the case smaller.');
+      }).filter(Boolean);
+    }
+    var w = WB.bedWarning(plates.footprints[0], b, 'The print layout',
+      'Choose "Base and lid apart" under Printer to print them on a plate each, or make the case smaller.');
     return w ? [w] : [];
+  }
+
+  /* Says where the parts will go, so "Automatic" is never a mystery. */
+  function paintPlates(plates) {
+    var el = $('#plates-readout');
+    if (!el) return;
+    var lid = plates.hooks ? 'the lid and its hooks' : 'the lid';
+    el.textContent = plates.split
+      ? 'Two plates: the base on plate 1, ' + lid + ' on plate 2' +
+        (plates.why === 'colours' ? ', as they are different colours.' : plates.why === 'size' ? ', as they only fit the bed apart.' : '.')
+      : 'One plate: the base and ' + lid + ' print together.';
   }
 
   function stats(model, ms) {
@@ -1198,13 +1218,15 @@
         catch (e) { busy(false); showWarnings([{ level: 'bad', msg: 'Build failed: ' + e.message }]); return; }
 
         busy(true, 'Packing 3MF…');
-        CS.exportThreeMF(model, state).then(function (blob) {
+        var plates = CS.printPlates(model, state);
+        CS.exportThreeMF(model, state, plates).then(function (blob) {
           WB.download(blob, safeName() + '.3mf');
           busy(false);
           var n = model.stats.colors;
           showWarnings(model.warnings.concat([{
             level: 'ok',
-            msg: 'Exported ' + safeName() + '.3mf — base and lid as two objects, ' + model.parts.length + ' bodies, ' +
+            msg: 'Exported ' + safeName() + '.3mf — base and lid as two objects' + (plates.split ? ' on two plates' : '') +
+                 ', ' + model.parts.length + ' bodies, ' +
                  n + ' colour' + (n === 1 ? '' : 's') + ', ' + model.stats.tris.toLocaleString() + ' triangles.'
           }]));
         }).catch(function (e) {
