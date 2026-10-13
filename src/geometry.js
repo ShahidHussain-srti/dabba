@@ -200,6 +200,14 @@ window.CS = window.CS || {};
     if (D.tray) warn = [];
     var n = WB.clamp(Math.round(H.count), 1, 6), k = WB.clamp(Math.round(H.knuckles), 2, 9);
     var rk = Math.max(1.5, H.diameter / 2), c = WB.clamp(H.clearance, 0.1, 1.5);
+    // Reinforced with no stop has no room for horns (below), so the knuckles
+    // grow instead: 8 mm leaves about 50% more ring around the pin than 6.
+    var bare = H.style !== 'leaves' && !(isFinite(H.stop) && H.stop < 179.5);
+    if (bare && rk < 4 && !D.tray) {
+      warn.push({ level: 'ok', msg: 'With no stop there is no room for the horns, so the knuckles are made 8 mm across (from ' +
+        (rk * 2).toFixed(1) + ' mm) to keep them strong. A stop of 110–130° strengthens them more.' });
+      rk = 4;
+    }
     var gap = WB.clamp(H.gap, 0.1, 2);
     var inset = Math.max(H.inset, D.R + 1);
     var span0 = -Wc / 2 + inset, span1 = Wc / 2 - inset, avail = span1 - span0;
@@ -256,8 +264,19 @@ window.CS = window.CS || {};
       var yH = rk + Math.max(2.4, rk), zQ = T0p[1] + (yH - T0p[0]) / dy * dzl;
       if (zQ < 0.6 && dzl < 0) { yH = T0p[0] + (0.6 - T0p[1]) / dzl * dy; zQ = 0.6; }
       if (yH > T0p[0] + 0.5) {
-        // Under the horn, 45° back to the knuckle, so it prints unsupported.
-        hg.horn = [T0p, [yH, zQ], [yH, Math.min(zQ, yH - rk * Math.SQRT2)]];
+        // Rounded: the hull of small circles tucked into its corners. The one
+        // at the top-back corner touches the stop face, so the top stays on it;
+        // the one at the front sits just inside radius R, clear of the swing;
+        // the one underneath sits on the 45° underside, which keeps the horn
+        // printable without support.
+        var r = Math.min(2, 0.45 * (yH - T0p[0])), nY = -dzl, nZ = dy;       // the face's normal, towards the other half
+        // Pulled in further on a tapered wall, whose face is tilted to the
+        // radius there, so the circle stays under the face (a hair's margin).
+        var cb = Math.cos(Math.atan(D.tanO || 0)), k = (r + (r * (1 - cb) + 0.02) / cb) / R0;
+        var cT = [T0p[0] * (1 - k), T0p[1] * (1 - k)];
+        var qy = yH - r, cQ = [qy, (nY * T0p[0] + nZ * T0p[1] - r - nY * qy) / nZ];
+        var cL = [qy, qy - (rk - r) * Math.SQRT2];
+        hg.horn = { r: r, at: cL[1] < cQ[1] ? [cT, cQ, cL] : [cT, cQ] };
         hg.back = Math.max(rk, yH);
       }
     }
@@ -1301,12 +1320,10 @@ window.CS = window.CS || {};
      (flip) for the lid. */
   function horn(S, hg, s, flip, seg) {
     if (!hg.horn) return null;
-    var pts = [];
-    hg.horn.forEach(function (q) {
-      var y = hg.ya + q[0], z = hg.za + (flip ? -q[1] : q[1]);
-      pts.push([s.x0, y, z], [s.x1, y, z]);
-    });
-    return hullOf(S, [cylX(S, s.x0, s.x1, hg.ya, hg.za, hg.rk, seg), hullPts(S, pts)]);
+    var H = hg.horn, rs = Math.max(12, Math.round(seg / 2));
+    return hullOf(S, [cylX(S, s.x0, s.x1, hg.ya, hg.za, hg.rk, seg)].concat(H.at.map(function (q) {
+      return cylX(S, s.x0, s.x1, hg.ya + q[0], hg.za + (flip ? -q[1] : q[1]), H.r, rs);
+    })));
   }
 
   /* A 45° dovetail across x = xc: w0 wide at y0, w1 = w0 + 2h wide at y0 + h,

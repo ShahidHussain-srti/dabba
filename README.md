@@ -67,8 +67,10 @@ locked until you turn Fill off.
   only by the layers at pin height, which is where printed hinges crack.
   - **Reinforced** (default): the knuckles print with the case, each with a horn behind it
     that makes that part of the ring thick. The horns are also a stop: the lid opens to the
-    angle you set (110° by default) and then rests on whole faces instead of levering the
-    knuckles. Set *Opens to* 180° for no stop.
+    angle you set (120° by default) and then rests on whole faces instead of levering the
+    knuckles. The horns only fit where the lid never goes, so they shrink as the stop opens
+    up and are gone past about 150°. At 180° (no stop) the knuckles are made at least 8 mm
+    across instead.
   - **Slide-in leaves**: every knuckle is a small piece of its own, printed standing on end so
     its ring lies within the layers. Each slides onto a 45° dovetail rail on the case, and the
     pin then holds them all on. *Rail fit* sets the clearance.
