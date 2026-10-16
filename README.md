@@ -94,7 +94,8 @@ each wall can be set separately too. Hinges and clasps always sit on a smooth su
 
 The lid top and the base underside can carry borders, text and pictures, the same way
 [Keychain Studio](https://shahidhussain-srti.github.io/keychains/) does it. Each element
-gets its own colour, set in, engraved or raised. Dragged elements snap to the edges and centre
+gets its own colour, set in, engraved or raised. Text has the same 67 fonts, shipped with
+the app so they look the same on every computer. Dragged elements snap to the edges and centre
 lines of the face, the inside of its border and each other (hold Alt to place freely).
 
 ### Getting around
@@ -216,6 +217,10 @@ There's no warranty. See [LICENSE](LICENSE) for the full text.
 [Manifold](https://github.com/elalish/manifold), © The Manifold Authors, under the Apache License 2.0
 ([vendor/workbench/LICENSE-manifold.txt](vendor/workbench/LICENSE-manifold.txt)), which is
 compatible with the GPL.
+
+The 67 text fonts are Google Fonts, each the Latin subset of its regular weight, under the
+SIL Open Font License 1.1 or the Apache License 2.0; the texts are in
+[vendor/workbench/fonts/LICENSE-fonts.txt](vendor/workbench/fonts/LICENSE-fonts.txt).
 
 `vendor/workbench/` is [Workbench](https://github.com/ShahidHussain-srti/workbench), by the
 same author under the same license.

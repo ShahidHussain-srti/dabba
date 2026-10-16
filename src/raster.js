@@ -44,7 +44,7 @@ window.CS = window.CS || {};
     return c._rev;
   }
   CS.faceElements = function (face, fo, g, mirror) {
-    var key = JSON.stringify([face, fo, g.cols, g.rows, g.ppmm, !!mirror,
+    var key = JSON.stringify([face, fo, g.cols, g.rows, g.ppmm, !!mirror, WB.fontEpoch,
       (face.arts || []).map(function (a) { return [bitmapRev(WB.assets.images[a.id]), bitmapRev(WB.assets.drawings[a.id])]; })]);
     var slot = mirror ? 'base' : 'lid';
     if (faceCache[slot] && faceCache[slot].key === key) return faceCache[slot].out;
