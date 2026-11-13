@@ -814,6 +814,8 @@
   function paintColours() {
     var used = CS.coloursUsed(state);
     WB.swatches(used);
+    var art = faceNow().arts[faceNow().artIdx], urlBox = $('#art-url');
+    if (urlBox && document.activeElement !== urlBox) urlBox.value = (art && art.url) || '';
     WB.artPaletteEditor($('#art-palette'), function () { var f = faceNow(); return f.arts[f.artIdx]; },
       function (fn) { var f = faceNow(), a = f.arts[f.artIdx]; if (!a) return; beginEdit(0); fn(a); apply(); });
     var box = $('#used-colours');
@@ -1137,6 +1139,7 @@
         beginEdit(0);
         CS.assets.images[art.id] = c;
         art.source = 'image';
+        art.url = '';
         refresh();
         apply();
       };
@@ -1148,7 +1151,31 @@
     fr.readAsDataURL(file);
   }
 
+  /* A picture from a web address. The address is kept on the picture, so
+     share links carry it and whoever opens one loads it from the same place. */
+  function loadImageLink() {
+    var url = $('#art-url').value.trim(), f = faceNow(), art = f.arts[f.artIdx];
+    if (!art || !url) return;
+    if (!WB.isImageURL(url)) {
+      showWarnings([{ level: 'bad', msg: 'A picture link has to start with https://.' }]);
+      return;
+    }
+    WB.loadImage(url, 1200).then(function (c) {
+      beginEdit(0);
+      CS.assets.images[art.id] = c;
+      art.source = 'image';
+      art.url = url;
+      refresh();
+      apply();
+    }, function () {
+      showWarnings([{ level: 'bad', msg: 'That link could not be used. Either it is not a picture, or its site ' +
+        'does not let other pages use its pictures; save the picture and upload it instead.' }]);
+    });
+  }
+
   function assets() {
+    $('#art-url-go').addEventListener('click', loadImageLink);
+    $('#art-url').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadImageLink(); });
     $('#art-file').addEventListener('change', function (e) {
       if (e.target.files && e.target.files[0]) loadImageFile(e.target.files[0]);
     });
@@ -1505,21 +1532,22 @@
       }
     });
 
-    jobs = jobs.filter(function (j) { return WB.isImageData(j.data); });   // inline pictures only
+    // Linked pictures without a saved copy (all a share link has) come from their sites.
+    ['lid', 'base'].forEach(function (w) {
+      (d.faces[w].arts || []).forEach(function (a) {
+        if (!WB.isImageURL(a.url)) { a.url = ''; return; }
+        if (a.source !== 'image' || assets['img:' + a.id]) return;
+        jobs.push({ data: a.url, link: true, put: function (c) { CS.assets.images[a.id] = c; } });
+      });
+    });
+
+    jobs = jobs.filter(function (j) { return j.link || WB.isImageData(j.data); });   // inline pictures or checked links
     var pending = jobs.length;
     if (!pending) { done(); return; }
     jobs.forEach(function (job) {
-      var img = new Image();
-      img.onload = function () {
-        var c = document.createElement('canvas');
-        c.width = img.width; c.height = img.height;
-        c.getContext('2d').drawImage(img, 0, 0);
-        c._rev = Date.now();
-        job.put(c);
-        if (!--pending) done();
-      };
-      img.onerror = function () { if (!--pending) done(); };
-      img.src = job.data;
+      WB.loadImage(job.data, job.link ? 1200 : 0).then(job.put, function () {
+        if (job.link) notice('warn', 'A linked picture could not be loaded: ' + job.data);
+      }).then(function () { if (!--pending) done(); });
     });
   }
 
@@ -1586,7 +1614,11 @@
      The settings travel in the link; pictures and image textures do not, as
      they would make it far too long. */
   function pictureCount() {
-    return Object.keys(CS.assets.images).length + Object.keys(CS.assets.drawings).length +
+    var linked = {};
+    ['lid', 'base'].forEach(function (w) {
+      ((state.faces)[w].arts || []).forEach(function (a) { if (a.url) linked[a.id] = true; });
+    });
+    return Object.keys(CS.assets.images).filter(function (k) { return !linked[k]; }).length + Object.keys(CS.assets.drawings).length +
            (CS.assets.texture ? 1 : 0);
   }
   /* The design as small as it goes for a link: compartments, texts and
@@ -1630,7 +1662,7 @@
         if (url.length > 8000) body.push('It is a long link, so some chat apps may cut it short.');
         if (pics) {
           body.push({ warn: true, text: 'Not included: ' + (pics === 1 ? 'a picture or image texture' : pics + ' pictures or image textures') +
-                     '. Links cannot carry those — to share the design complete, send the file from Save (.case.json) or the exported 3MF.' });
+                     '. Links cannot carry uploads; use a picture\'s web address instead, or to share the design complete, send the file from Save (.case.json) or the exported 3MF.' });
         }
         WB.sharePopup({ anchor: btn, title: ok ? 'Link copied' : 'Share this link', link: url, linkCopied: ok, body: body });
       });

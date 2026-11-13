@@ -94,7 +94,7 @@ each wall can be set separately too. Hinges and clasps always sit on a smooth su
 
 The lid top and the base underside can carry borders, text and pictures, the same way
 [Keychain Studio](https://shahidhussain-srti.github.io/keychains/) does it. Each element
-gets its own colour, set in, engraved or raised; a picture traced with **All colours** keeps
+gets its own colour, set in, engraved or raised; a picture can be uploaded or added by its web address (which share links carry); one traced with **All colours** keeps
 its own colours instead, merging shades that look alike. Every colour field has a strip of
 swatches below it: the design's colours, plus any you save with **+**. Text has the same 67 fonts, shipped with
 the app so they look the same on every computer. Dragged elements snap to the edges and centre
@@ -192,10 +192,12 @@ colours.
 ## Privacy
 
 There are no accounts, cookies, analytics or trackers, and the page loads nothing from
-other sites. Designs and pictures stay in your browser's local storage, which the app
+other sites except a picture you add by its web address. Designs and uploaded pictures stay in your browser's local storage, which the app
 only uses to keep your work, and leave it only as files you save or export. A share link
 holds the design after the `#`, which browsers don't send to the server, so it goes only
-where you send it (and anyone with it can read it); pictures never go in links. The site
+where you send it (and anyone with it can read it); uploaded pictures never go in links.
+A picture added by its web address travels as that address, and opening the link loads it
+from that site, which sees the request. The site
 is hosted on GitHub Pages, where GitHub keeps standard request logs under its own privacy
 statement. Designs → Delete all saved data removes everything the app has kept.
 

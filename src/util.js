@@ -17,7 +17,7 @@ window.CS = window.CS || {};
   CS.newArt = function (opts) {
     return Object.assign({
       id: WB.newId('a'), source: 'none', mode: 'auto', threshold: 0.5, size: 20,
-      rotation: 0, mirror: false, x: 0, y: 0, color: '#4b8ef0', merge: 12, recolor: {}
+      rotation: 0, mirror: false, x: 0, y: 0, color: '#4b8ef0', merge: 12, recolor: {}, url: ''
     }, opts || {});
   };
 
