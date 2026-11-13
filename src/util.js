@@ -138,8 +138,9 @@ window.CS = window.CS || {};
   CS.faceItems = function (face) {
     var out = [];
     if (face.border.style !== 'none') out.push({ kind: 'border', item: face.border });
-    (face.arts || []).forEach(function (a, i) { out.push({ kind: 'art', item: a, index: i }); });
-    (face.texts || []).forEach(function (t, i) { out.push({ kind: 'text', item: t, index: i }); });
+    // Hidden ones stay out of the views and the model, keeping their numbers.
+    (face.arts || []).forEach(function (a, i) { if (!a.hidden) out.push({ kind: 'art', item: a, index: i }); });
+    (face.texts || []).forEach(function (t, i) { if (!t.hidden) out.push({ kind: 'text', item: t, index: i }); });
     return out;
   };
 

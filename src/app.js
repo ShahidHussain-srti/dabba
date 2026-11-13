@@ -727,6 +727,12 @@
                       '<span class="num">' + (i + 1) + '</span>';
         $('.dot', b).style.background = item.color;
         $('.txt', b).textContent = label;
+        var line = document.createElement('div');
+        line.className = 'itemline' + (item.hidden ? ' off' : '');
+        line.appendChild(b);
+        line.appendChild(WB.eyeButton(item.hidden, function () {
+          beginEdit(0); item.hidden = !item.hidden; refresh(); apply();
+        }));
         b.addEventListener('click', function () {
           f[row[0] === 'text' ? 'textIdx' : 'artIdx'] = i;
           face.selected = row[0] + ':' + i;
@@ -734,7 +740,7 @@
           refresh();
           apply({ rebuild: false });
         });
-        box.appendChild(b);
+        box.appendChild(line);
       });
     });
     $('#text-editor').hidden = !(f.texts || []).length;
@@ -919,7 +925,7 @@
       viewer.draw();
     }
     stats(model, performance.now() - t0);
-    showWarnings(model.warnings.concat(bedWarnings(plates)));
+    showWarnings(WB.hiddenWarning([state.faces.lid, state.faces.base]).concat(model.warnings, bedWarnings(plates)));
   }, 180);
 
   /* Does the print layout fit the bed? Turned a quarter, if that helps; with
@@ -1640,8 +1646,8 @@
     ['lid', 'base'].forEach(function (w) {
       var f = full.faces && full.faces[w];
       if (!f) return;
-      f.texts = (f.texts || []).map(function (t) { return WB.shareTrim(t, CS.newText(), ['id']); });
-      f.arts = (f.arts || []).map(function (a) { return WB.shareTrim(a, CS.newArt(), ['id']); });
+      f.texts = (f.texts || []).map(function (t) { return WB.shareTrim(t, CS.newText(), ['id', 'hidden']); });
+      f.arts = (f.arts || []).map(function (a) { return WB.shareTrim(a, CS.newArt(), ['id', 'hidden']); });
     });
     return full;
   }

@@ -269,6 +269,7 @@ window.CS = window.CS || {};
     if (!face.enabled) return out;
 
     (face.arts || []).forEach(function (a, i) {
+      if (a.hidden) return;
       var p = WB.artPlacement(a, t);
       if (!p) return;
       out.push({ key: 'art:' + i, label: 'Picture ' + (i + 1), cx: p.cx, cy: p.cy,
@@ -276,6 +277,7 @@ window.CS = window.CS || {};
     });
 
     (face.texts || []).forEach(function (tx, i) {
+      if (tx.hidden) return;
       var L = WB.textLayout(ctx, tx, t);
       if (!L || L.width < 4) return;
       out.push({ key: 'text:' + i, label: 'Text ' + (i + 1),
