@@ -631,9 +631,12 @@
               <option value="alpha">Transparency</option>
               <option value="dark">Dark areas</option>
               <option value="light">Light areas</option>
+              <option value="colors">All colours</option>
             </select>
           </div>
-          <div class="row num" data-num="~a.threshold" data-id="f-a-threshold" data-min="5" data-max="95" data-step="1" data-unit="%" data-scale="100" data-show="~a.source:image" data-hide="~a.mode:alpha">Threshold</div>
+          <div class="row num" data-num="~a.threshold" data-id="f-a-threshold" data-min="5" data-max="95" data-step="1" data-unit="%" data-scale="100" data-show="~a.source:image" data-hide="~a.mode:alpha|colors">Threshold</div>
+          <div class="row num" data-num="~a.merge" data-id="f-a-merge" data-min="0" data-max="60" data-step="1" data-show="~a.source:image ~a.mode:colors">Merge similar colours</div>
+          <div id="art-palette" data-show="~a.source:image ~a.mode:colors"></div>
           <div data-hide="~a.source:none">
             <div class="row num" data-num="~a.size" data-min="3" data-max="250" data-step="0.5" data-unit="mm">Size</div>
             <div class="row num" data-num="~a.rotation" data-min="-180" data-max="180" data-step="1" data-unit="°">Rotation</div>
@@ -644,7 +647,7 @@
             <div class="row num" data-num="~a.x" data-min="-100" data-max="100" data-step="0.25" data-unit="mm" data-range="pos">Position across</div>
             <div class="row num" data-num="~a.y" data-min="-100" data-max="100" data-step="0.25" data-unit="mm" data-range="pos">Position up/down</div>
           </div>
-          <div class="row">
+          <div class="row" data-hide="~a.source:image ~a.mode:colors">
             <label for="f-a-color">Colour</label>
             <input id="f-a-color" type="color" class="colorfield" data-bind="~a.color">
           </div>

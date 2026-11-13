@@ -1818,8 +1818,8 @@ window.CS = window.CS || {};
         var e = s.e, n = e.kind === 'border' ? '' : ' ' + (e.index + 1);
         out.parts.push({
           m: s.m, half: which, color: e.color,
-          key: e.kind + (e.kind === 'border' ? '' : (e.index + 1)) + '-' + which,
-          label: NAME[e.kind] + n + ' (' + (which === 'lid' ? 'lid' : 'base') + ')'
+          key: e.kind + (e.kind === 'border' ? '' : (e.index + 1)) + (e.layer ? 'c' + e.layer : '') + '-' + which,
+          label: NAME[e.kind] + n + (e.layer ? ' colour ' + e.layer : '') + ' (' + (which === 'lid' ? 'lid' : 'base') + ')'
         });
       });
     });
@@ -1875,11 +1875,12 @@ window.CS = window.CS || {};
         }
       }
       i.F.raw.forEach(function (r) {
-        var live = i.F.list.filter(function (e) { return e.kind === r.kind && e.index === r.index; })[0];
+        var live = i.F.list.filter(function (e) { return e.kind === r.kind && e.index === r.index; });
         var what = r.kind === 'text' ? 'Text ' + (r.index + 1) : r.kind === 'art' ? 'Picture ' + (r.index + 1) : 'The border';
-        if (!live) {
+        var area = live.reduce(function (s, e) { return s + WB.mask.area(e.mask, i.grid); }, 0);
+        if (!live.length) {
           if (r.kind !== 'border') warn.push({ level: 'bad', msg: what + ' on ' + tag + ' sits off the flat face, or is hidden behind something on top of it.' });
-        } else if (WB.mask.area(live.mask, i.grid) < WB.mask.area(r.mask, i.grid) * 0.97) {
+        } else if (area < WB.mask.area(r.mask, i.grid) * 0.97) {
           warn.push({ level: 'warn', msg: what + ' on ' + tag + ' is partly clipped by the edge rounding or an element above it.' });
         }
       });

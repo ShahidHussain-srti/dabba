@@ -94,7 +94,9 @@ each wall can be set separately too. Hinges and clasps always sit on a smooth su
 
 The lid top and the base underside can carry borders, text and pictures, the same way
 [Keychain Studio](https://shahidhussain-srti.github.io/keychains/) does it. Each element
-gets its own colour, set in, engraved or raised. Text has the same 67 fonts, shipped with
+gets its own colour, set in, engraved or raised; a picture traced with **All colours** keeps
+its own colours instead, merging shades that look alike. Every colour field has a strip of
+swatches below it: the design's colours, plus any you save with **+**. Text has the same 67 fonts, shipped with
 the app so they look the same on every computer. Dragged elements snap to the edges and centre
 lines of the face, the inside of its border and each other (hold Alt to place freely).
 

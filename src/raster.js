@@ -58,15 +58,20 @@ window.CS = window.CS || {};
     var plate = CS.faceMask(fo, g);
 
     CS.faceItems(face).forEach(function (e) {
-      var m = null;
-      if (e.kind === 'border') m = WB.borderMask(face.border, fo, g, plate);
-      else if (e.kind === 'text') m = WB.textMask(e.item, g);
-      else m = WB.artMask(e.item, g);
-      if (!m) return;
-      if (mirror) m = WB.mirrorMaskX(m, g);
-      out.raw.push({ kind: e.kind, index: e.index, mask: m });
-      out.list.push({ kind: e.kind, index: e.index, item: e.item,
-                      color: e.item.color, mask: WB.mask.and(m, plate) });
+      // A multi-colour picture is one layer per colour; `layer` numbers them.
+      var layers = e.kind === 'art' ? WB.artLayers(e.item, g) : [];
+      if (e.kind === 'border') layers = [{ mask: WB.borderMask(face.border, fo, g, plate) }];
+      else if (e.kind === 'text') layers = [{ mask: WB.textMask(e.item, g) }];
+      var all = null;
+      layers.forEach(function (l, i) {
+        var m = l.mask;
+        if (!m) return;
+        if (mirror) m = WB.mirrorMaskX(m, g);
+        all = WB.mask.union(all, m);
+        out.list.push({ kind: e.kind, index: e.index, item: e.item, layer: layers.length > 1 ? i + 1 : 0,
+                        color: l.color || e.item.color, mask: WB.mask.and(m, plate) });
+      });
+      if (all) out.raw.push({ kind: e.kind, index: e.index, mask: all });
     });
 
     /* Topmost wins: walk down the stack subtracting everything above. */
