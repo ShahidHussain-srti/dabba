@@ -980,7 +980,9 @@
     $$('[data-bind]').forEach(function (el) {
       if (el.classList.contains('seg')) syncSeg(el, el.dataset.bind);
     });
-    paintColours();
+    // A hiccup in the colour panel must not stop the mesh.
+    try { paintColours(); }
+    catch (e) { console.error('colour panel failed', e); }
     paintFacePanel();
     paintReadouts();
     drawViews();
